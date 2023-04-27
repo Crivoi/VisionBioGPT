@@ -65,8 +65,26 @@ class MimicDatabase:
             ON d.subject_id = n.subject_id
             AND d.hadm_id = n.hadm_id
             AND n.category = %s
+            AND d.icd9_code IN %s
         """
-        self.execute_query(query, [self.category])
+        self.execute_query(query, [self.category, tuple(self.top_icd9_codes)])
+        return self.fetchone()
+
+    @cached_property
+    def count_subject_ids(self):
+        """
+        :return: Number of distinct hospital admission ids
+        """
+        query = """
+            SELECT count(distinct d.hadm_id)
+            FROM mimiciii.diagnoses_icd d 
+            JOIN mimiciii.noteevents n
+            ON d.subject_id = n.subject_id
+            AND d.hadm_id = n.hadm_id
+            AND n.category = %s
+            AND d.icd9_code IN %s
+        """
+        self.execute_query(query, [self.category, tuple(self.top_icd9_codes)])
         return self.fetchone()
 
     def query_text_and_icd9_code(self):
@@ -77,9 +95,10 @@ class MimicDatabase:
             ON d.subject_id = n.subject_id
             AND d.hadm_id = n.hadm_id
             AND n.category = %s
+            AND d.icd9_code IN %s
             LIMIT 100
         """
-        self.execute_query(query, [self.category])
+        self.execute_query(query, [self.category, tuple(self.top_icd9_codes)])
 
     def execute_query(self, query: str or sql.SQL, query_args: list = None):
         return self._cursor.execute(query, query_args)
@@ -96,5 +115,7 @@ class MimicDatabase:
 
 if __name__ == '__main__':
     database: MimicDatabase = MimicDatabase()
-    print(database.top_icd9_codes)
-    print(database.count_discharge_summaries)
+    print('Top Codes:', database.top_icd9_codes)
+    print('Total discharge summaries:', database.count_discharge_summaries)
+    print('Subject ids:', database.count_subject_ids)
+    print('Hadm ids:', database.count_hadm_ids)

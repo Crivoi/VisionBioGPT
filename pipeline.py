@@ -1,3 +1,4 @@
+import torch
 from transformers import TrainingArguments, Trainer
 
 from dataset import train_loader, test_loader, mimic_dataset
@@ -20,6 +21,7 @@ trainer: Trainer = Trainer(
     tokenizer=model.tokenizer,
 )
 
+optimizer = torch.optim.Adam(model.parameters(), lr=2e-5)
 
 if __name__ == '__main__':
     trainer.train()
