@@ -1,6 +1,7 @@
 from functools import cached_property
 
 import psycopg2
+from psycopg2 import sql
 
 from settings import POSTGRES_DB_NAME, POSTGRES_USERNAME, POSTGRES_PASSWORD
 
@@ -18,22 +19,22 @@ class MimicDatabase:
     def __init__(self):
         self.category = 'Discharge summary'
 
-        self.conn = psycopg2.connect(
+        self._conn = psycopg2.connect(
             database=POSTGRES_DB_NAME,
             user=POSTGRES_USERNAME,
             password=POSTGRES_PASSWORD,
             host='localhost',
             port='5432'
         )
-        self.cursor = self.conn.cursor()
+        self._cursor = self._conn.cursor()
 
     @cached_property
     def top_icd9_codes(self):
-        self.cursor.execute("""
+        self.execute_query("""
             SELECT icd9_code FROM mimiciii.diagnoses_icd 
             GROUP BY icd9_code ORDER BY count(*) DESC LIMIT 50
-            """)
-        return [r[0] for r in self.cursor.fetchall()]
+        """)
+        return [r[0] for r in self.fetchall()]
 
     @cached_property
     def count_discharge_summaries(self):
@@ -47,9 +48,10 @@ class MimicDatabase:
             ON d.subject_id = n.subject_id
             AND d.hadm_id = n.hadm_id
             AND n.category = %s
+            AND d.icd9_code IN %s
         """
-        self.cursor.execute(query, [self.category])
-        return self.cursor.fetchone()[0]
+        self.execute_query(query, [self.category, tuple(self.top_icd9_codes)])
+        return self.fetchone()
 
     @cached_property
     def count_hadm_ids(self):
@@ -64,8 +66,8 @@ class MimicDatabase:
             AND d.hadm_id = n.hadm_id
             AND n.category = %s
         """
-        self.cursor.execute(query, [self.category])
-        return self.cursor.fetchone()[0]
+        self.execute_query(query, [self.category])
+        return self.fetchone()
 
     def query_text_and_icd9_code(self):
         query = """
@@ -75,11 +77,24 @@ class MimicDatabase:
             ON d.subject_id = n.subject_id
             AND d.hadm_id = n.hadm_id
             AND n.category = %s
+            LIMIT 100
         """
-        self.cursor.execute(query, [self.category])
+        self.execute_query(query, [self.category])
+
+    def execute_query(self, query: str or sql.SQL, query_args: list = None):
+        return self._cursor.execute(query, query_args)
+
+    def fetchone(self):
+        return self._cursor.fetchone()[0]
+
+    def fetchmany(self, size: int = 32):
+        return self._cursor.fetchmany(size)
+
+    def fetchall(self):
+        return self._cursor.fetchall()
 
 
 if __name__ == '__main__':
-    database = MimicDatabase()
+    database: MimicDatabase = MimicDatabase()
     print(database.top_icd9_codes)
     print(database.count_discharge_summaries)

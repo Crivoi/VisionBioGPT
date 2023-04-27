@@ -1,20 +1,47 @@
-from transformers import set_seed
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from torch import optim
+from torch import nn
+from transformers import BioGptTokenizer, BioGptForCausalLM
 
 from dataset import mimic_dataset
-from preprocessing import preprocess_noteevent
-from utils import ModelCheckpoint
+from settings import DEVICE
 
-model_checkpoint = ModelCheckpoint.BioGPT.value
-tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
-model = AutoModelForCausalLM.from_pretrained(model_checkpoint)
+
+class BioGptForSequenceClassification(nn.Module):
+    model_checkpoint: str = "microsoft/biogpt"
+    optimizer: optim.Optimizer = optim.Adam()
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.tokenizer = BioGptTokenizer.from_pretrained(self.model_checkpoint)
+        self.transformer = BioGptForCausalLM.from_pretrained(self.model_checkpoint)
+
+    def forward(self, input_ids, labels):
+        return self.transformer(input_ids=input_ids, labels=labels)
+
+    def to(self):
+        self.transformer.to(DEVICE)
+
+    def generate(self, input_ids):
+        prediction = self.transformer.generate(
+            input_ids=input_ids,
+            max_length=1024,
+            min_length=5
+        )
+        # return prediction[:, 1:]
+        return prediction
+
+    def encode(self, prompt: str):
+        output = self.tokenizer.encode(prompt, return_tensors="pt")
+        return output
+
+    def decode(self, encoder_output):
+        output = self.tokenizer.decode(encoder_output[0], skip_special_tokens=True)
+        return output
+
 
 if __name__ == '__main__':
-    # set_seed(SEED)
-    batch = mimic_dataset[0]
-    prompt = f"{preprocess_noteevent(batch[0][0])}\n\nThe relevant diagnosis ICD code is"
-    print(prompt)
-    input_ids = tokenizer.encode(prompt, return_tensors="pt")
-    output = model.generate(input_ids=input_ids, max_length=1000, do_sample=True)
-    output_str = tokenizer.decode(output[0], skip_special_tokens=True)
-    print(output_str)
+    example = mimic_dataset[0][0][0][:512]
+    code = mimic_dataset[0][0][1]
+    prompt = f"{example}\n\nThe relevant diagnosis ICD code is"
+    model = BioGptForSequenceClassification()
+    model(model.encode(prompt), model.encode(code))
