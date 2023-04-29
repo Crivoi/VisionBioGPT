@@ -4,7 +4,8 @@ import torch
 from torch import nn
 from torch import optim
 from torch.nn import functional as F
-from transformers import BioGptTokenizer, BioGptModel, BioGptPreTrainedModel, BioGptForCausalLM, BertForSequenceClassification
+from transformers import BioGptTokenizer, BioGptModel, BioGptPreTrainedModel, BioGptForCausalLM, \
+    BertForSequenceClassification
 from transformers.modeling_outputs import SequenceClassifierOutput
 
 from dataset import mimic_dataset
@@ -12,10 +13,6 @@ from dataset import mimic_dataset
 
 class BioGptForSequenceClassification(BioGptPreTrainedModel):
     model_checkpoint: str = "microsoft/biogpt"
-    optimizer: optim.Optimizer = optim.Adam()
-    loss_fn = nn.functional.binary_cross_entropy_with_logits()
-    tokenizer = BioGptTokenizer.from_pretrained(model_checkpoint)
-    criterion = nn.BCEWithLogitsLoss()
 
     def __init__(self, config) -> None:
         super().__init__(config)
@@ -55,6 +52,7 @@ class BioGptForSequenceClassification(BioGptPreTrainedModel):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            labels=labels
         )
         pooled_output = outputs[1]
 
@@ -87,6 +85,31 @@ class BioGptForSequenceClassification(BioGptPreTrainedModel):
 
     def prepare_inputs_for_generation(self, *args, **kwargs):
         pass
+
+
+class BioGptForTest(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.transformer = BioGptForCausalLM.from_pretrained('microsoft/biogpt')
+
+    def forward(self, input_ids, labels):
+        return self.transformer(input_ids=input_ids, labels=labels)
+
+    def to(self, device):
+        self.transformer.to(device)
+
+    def generate(self, input_tensor):
+        max_length = 50
+        min_length = 5
+
+        prediction = self.transformer.generate(
+            input_ids=input_tensor,
+            num_beams=1,
+            max_length=max_length + 1,
+            min_length=min_length
+        )
+
+        return prediction[:, 1:]
 
 
 if __name__ == '__main__':

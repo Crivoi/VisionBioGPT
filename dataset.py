@@ -1,9 +1,13 @@
-from typing import Dict
+from typing import Dict, Union, List
 
 import numpy as np
+from nltk import RegexpTokenizer
+from numpy import ndarray
 from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler
+from transformers import BioGptTokenizer
 
 from database import MimicDatabase
+from preprocessing import Preprocessor
 
 
 class MimicDataset(Dataset):
@@ -19,7 +23,12 @@ class MimicDataset(Dataset):
     def __getitem__(self, index):
         self.database.query_text_and_icd9_code()
         rows = np.array(self.database.fetchmany(self.batch_size))
-        return rows[:, 0], rows[:, 1]
+        texts, labels = rows[:, 0], rows[:, 1]
+
+        tokenized = [Preprocessor.tokenize(text) for text in texts]
+        input_ids = [Preprocessor.encode(tokens) for tokens in tokenized]
+
+        return texts, labels
 
 
 def train_test_split(dataset: MimicDataset, train_ratio: float = .8) -> Dict[str, DataLoader]:
@@ -38,9 +47,11 @@ def train_test_split(dataset: MimicDataset, train_ratio: float = .8) -> Dict[str
 
 
 mimic_dataset: MimicDataset = MimicDataset()
-train_loader: DataLoader
-test_loader: DataLoader
-train_loader, test_loader = train_test_split(mimic_dataset)
+mimic_loader: Dict[str, DataLoader] = train_test_split(mimic_dataset)
 
 if __name__ == '__main__':
-    print(mimic_dataset[0])
+    train_loader = mimic_loader.get('train')
+    for idx, item in enumerate(train_loader):
+        print(idx, item)
+        if idx > 1:
+            break

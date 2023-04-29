@@ -1,27 +1,75 @@
 import torch
-from transformers import TrainingArguments, Trainer
+from torch import nn
+from transformers import TrainingArguments, Trainer, BioGptForCausalLM, BioGptTokenizer
 
-from dataset import train_loader, test_loader, mimic_dataset
-from model import model
+import settings
+from dataset import mimic_loader
+from model import BioGptForTest
 
-training_args: TrainingArguments = TrainingArguments(
-    output_dir='./results',
-    learning_rate=2e-5,
-    per_device_train_batch_size=mimic_dataset.batch_size,
-    per_device_eval_batch_size=mimic_dataset.batch_size,
-    num_train_epochs=5,
-    weight_decay=0.01,
-)
 
-trainer: Trainer = Trainer(
-    model=model,
-    args=training_args,
-    train_dataset=train_loader,
-    eval_dataset=test_loader,
-    tokenizer=model.tokenizer,
-)
+# from model import model
 
-optimizer = torch.optim.Adam(model.parameters(), lr=2e-5)
+# training_args: TrainingArguments = TrainingArguments(
+#     output_dir='./results',
+#     learning_rate=2e-5,
+#     per_device_train_batch_size=mimic_dataset.batch_size,
+#     per_device_eval_batch_size=mimic_dataset.batch_size,
+#     num_train_epochs=5,
+#     weight_decay=0.01,
+# )
+#
+# trainer: Trainer = Trainer(
+#     model=model,
+#     args=training_args,
+#     train_dataset=train_loader,
+#     eval_dataset=test_loader,
+#     tokenizer=model.tokenizer,
+# )
+
+
+class BioGptTrainer:
+    def __init__(self, model, train_loader, lr=2e-4):
+        self.model = model
+        self.train_loader = train_loader
+        self.optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+        self.criterion = nn.BCEWithLogitsLoss()
+        self.device = settings.DEVICE
+
+    def train(self):
+        self.model.train()
+        total_loss = 0.0
+        total_accuracy = 0.0
+        total_steps = 0
+        for batch in self.train_loader:
+            # Move batch to device
+            # batch = {k: v.to(device) for k, v in batch.items()}
+
+            # Zero gradients
+            self.optimizer.zero_grad()
+
+            # Forward pass
+            outputs = model(batch)
+            loss = self.criterion(outputs.logits, batch[1])
+
+            # Backward pass
+            loss.backward()
+            self.optimizer.step()
+
+            # Compute accuracy
+            preds = torch.argmax(outputs.logits, dim=1)
+            accuracy = torch.mean((preds == batch[1]).float())
+
+            # Update metrics
+            total_loss += loss.item()
+            total_accuracy += accuracy.item()
+            total_steps += 1
+
+        avg_loss = total_loss / total_steps
+        avg_accuracy = total_accuracy / total_steps
+        return avg_loss, avg_accuracy
+
 
 if __name__ == '__main__':
+    model = BioGptForTest()
+    trainer = BioGptTrainer(model=model, train_loader=mimic_loader.get('train'))
     trainer.train()
