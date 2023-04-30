@@ -1,4 +1,5 @@
 from functools import cached_property
+from typing import Union
 
 import psycopg2
 from psycopg2 import sql
@@ -51,7 +52,7 @@ class MimicDatabase:
             AND d.icd9_code IN %s
         """
         self.execute_query(query, [self.category, tuple(self.top_icd9_codes)])
-        return self.fetchone()
+        return self.fetchone()[0]
 
     @cached_property
     def count_hadm_ids(self):
@@ -68,7 +69,7 @@ class MimicDatabase:
             AND d.icd9_code IN %s
         """
         self.execute_query(query, [self.category, tuple(self.top_icd9_codes)])
-        return self.fetchone()
+        return self.fetchone()[0]
 
     @cached_property
     def count_subject_ids(self):
@@ -85,7 +86,7 @@ class MimicDatabase:
             AND d.icd9_code IN %s
         """
         self.execute_query(query, [self.category, tuple(self.top_icd9_codes)])
-        return self.fetchone()
+        return self.fetchone()[0]
 
     def query_text_and_icd9_code(self):
         query = """
@@ -96,15 +97,15 @@ class MimicDatabase:
             AND d.hadm_id = n.hadm_id
             AND n.category = %s
             AND d.icd9_code IN %s
-            LIMIT 100
+            LIMIT 10
         """
         self.execute_query(query, [self.category, tuple(self.top_icd9_codes)])
 
-    def execute_query(self, query: str or sql.SQL, query_args: list = None):
+    def execute_query(self, query: Union[str, sql.SQL], query_args: list = None):
         return self._cursor.execute(query, query_args)
 
     def fetchone(self):
-        return self._cursor.fetchone()[0]
+        return self._cursor.fetchone()
 
     def fetchmany(self, size: int = 32):
         return self._cursor.fetchmany(size)
@@ -117,5 +118,5 @@ if __name__ == '__main__':
     database: MimicDatabase = MimicDatabase()
     print('Top Codes:', database.top_icd9_codes)
     print('Total discharge summaries:', database.count_discharge_summaries)
-    print('Subject ids:', database.count_subject_ids)
-    print('Hadm ids:', database.count_hadm_ids)
+    print('# Distinct Subject ids:', database.count_subject_ids)
+    print('# Distinct Hadm ids:', database.count_hadm_ids)

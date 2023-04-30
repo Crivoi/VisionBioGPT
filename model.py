@@ -5,8 +5,8 @@ from torch import nn
 from torch import optim
 from torch.nn import functional as F
 from transformers import BioGptTokenizer, BioGptModel, BioGptPreTrainedModel, BioGptForCausalLM, \
-    BertForSequenceClassification
-from transformers.modeling_outputs import SequenceClassifierOutput
+    BertForSequenceClassification, BioGptConfig
+from transformers.modeling_outputs import SequenceClassifierOutput, CausalLMOutputWithCrossAttentions
 
 from dataset import mimic_dataset
 
@@ -74,8 +74,12 @@ class BioGptForSequenceClassification(BioGptPreTrainedModel):
             attentions=outputs.attentions,
         )
 
-    def _reorder_cache(self, past_key_values, beam_idx):
-        pass
+    @staticmethod
+    def _reorder_cache(past_key_values, beam_idx):
+        reordered_past = ()
+        for layer_past in past_key_values:
+            reordered_past += (tuple(past_state.index_select(0, beam_idx) for past_state in layer_past),)
+        return reordered_past
 
     def get_position_embeddings(self) -> Union[nn.Embedding, Tuple[nn.Embedding]]:
         pass
@@ -90,19 +94,23 @@ class BioGptForSequenceClassification(BioGptPreTrainedModel):
 class BioGptForTest(nn.Module):
     def __init__(self) -> None:
         super().__init__()
-        self.transformer = BioGptForCausalLM.from_pretrained('microsoft/biogpt')
+        self.config = BioGptConfig()
+        self.biogpt = BioGptModel(self.config)
+        self.linear = nn.Linear(self.config.hidden_size, 50)
 
     def forward(self, input_ids, labels):
-        return self.transformer(input_ids=input_ids, labels=labels)
+        outputs = self.biogpt(input_ids.squeeze())
+        outputs = self.linear(outputs.last_hidden_state)
+        return outputs
 
     def to(self, device):
-        self.transformer.to(device)
+        self.biogpt.to(device)
 
     def generate(self, input_tensor):
-        max_length = 50
-        min_length = 5
+        max_length = 5
+        min_length = 3
 
-        prediction = self.transformer.generate(
+        prediction = self.biogpt.generate(
             input_ids=input_tensor,
             num_beams=1,
             max_length=max_length + 1,
@@ -113,9 +121,4 @@ class BioGptForTest(nn.Module):
 
 
 if __name__ == '__main__':
-    example = mimic_dataset[0][0][0][:512]
-    code = mimic_dataset[0][0][1]
-    prompt = f"{example}\n\nThe relevant diagnosis ICD code is"
-    model = BioGptForSequenceClassification()
-    model.tokenizer.encode(prompt)
-    model(model.encode(prompt), model.encode(code))
+    pass

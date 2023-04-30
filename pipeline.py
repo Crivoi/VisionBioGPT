@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from tqdm import tqdm
 from transformers import TrainingArguments, Trainer, BioGptForCausalLM, BioGptTokenizer
 
 import settings
@@ -40,7 +41,7 @@ class BioGptTrainer:
         total_loss = 0.0
         total_accuracy = 0.0
         total_steps = 0
-        for batch in self.train_loader:
+        for batch in tqdm(self.train_loader):
             # Move batch to device
             # batch = {k: v.to(device) for k, v in batch.items()}
 
@@ -48,16 +49,16 @@ class BioGptTrainer:
             self.optimizer.zero_grad()
 
             # Forward pass
-            outputs = model(batch)
-            loss = self.criterion(outputs.logits, batch[1])
+            outputs = model(batch[0].squeeze(), batch[1].squeeze())
+            loss = self.criterion(torch.mean(outputs, dim=2), batch[1].squeeze().float())
 
             # Backward pass
             loss.backward()
             self.optimizer.step()
 
             # Compute accuracy
-            preds = torch.argmax(outputs.logits, dim=1)
-            accuracy = torch.mean((preds == batch[1]).float())
+            preds = torch.argmax(outputs, dim=2)
+            accuracy = torch.mean((preds == batch[1].squeeze()).float())
 
             # Update metrics
             total_loss += loss.item()
