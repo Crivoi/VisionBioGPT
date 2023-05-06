@@ -13,4 +13,5 @@ POSTGRES_PASSWORD = os.getenv('POSTGRES_PASSWORD', 'postgres')
 
 DEVICE = device("cuda" if cuda.is_available() else "cpu")
 
-MIMIC_MAX_LENGTH = 128
+MIMIC_MAX_LENGTH = 512
+NUM_LABELS = 50

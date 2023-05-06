@@ -5,7 +5,7 @@ from transformers import TrainingArguments, Trainer, BioGptForCausalLM, BioGptTo
 
 import settings
 from dataset import mimic_loader
-from model import BioGptForTest
+from model import BioGptForSequenceClassification
 
 
 # from model import model
@@ -71,6 +71,6 @@ class BioGptTrainer:
 
 
 if __name__ == '__main__':
-    model = BioGptForTest()
+    model = BioGptForSequenceClassification()
     trainer = BioGptTrainer(model=model, train_loader=mimic_loader.get('train'))
     trainer.train()

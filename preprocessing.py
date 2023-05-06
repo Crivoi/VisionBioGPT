@@ -6,7 +6,7 @@ from transformers import BioGptTokenizer
 from settings import MIMIC_MAX_LENGTH
 
 
-class Preprocessor:
+class TextProcessor:
     regexp_tokenizer = RegexpTokenizer(r'\w+')
     biogpt_tokenizer = BioGptTokenizer.from_pretrained('microsoft/biogpt')
 
@@ -15,8 +15,14 @@ class Preprocessor:
         return cls.regexp_tokenizer.tokenize(text.lower())
 
     @classmethod
-    def encode(cls, text: Union[List[str], str], padding='max_length'):
-        return cls.biogpt_tokenizer.encode(text, padding=padding, return_tensors='pt')
+    def encode(cls, text: Union[List[str], str], padding: str = 'max_length', max_length: int = MIMIC_MAX_LENGTH,
+               truncation: bool = True):
+        return cls.biogpt_tokenizer.encode(text, padding=padding, max_length=max_length, truncation=truncation,
+                                           return_tensors='pt')
+
+    @classmethod
+    def decode(cls, output):
+        return cls.biogpt_tokenizer.decode(output, skip_special_tokens=True)
 
 
 def sliding_window(input_array, window_size=512, stride=256):

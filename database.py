@@ -88,6 +88,20 @@ class MimicDatabase:
         self.execute_query(query, [self.category, tuple(self.top_icd9_codes)])
         return self.fetchone()[0]
 
+    @cached_property
+    def count_icd9_codes(self):
+        query = """
+            SELECT count(distinct d.icd9_code)
+            FROM mimiciii.diagnoses_icd d 
+            JOIN mimiciii.noteevents n
+            ON d.subject_id = n.subject_id
+            AND d.hadm_id = n.hadm_id
+            AND n.category = %s
+            AND d.icd9_code IN %s
+        """
+        self.execute_query(query, [self.category, tuple(self.top_icd9_codes)])
+        return self.fetchone()[0]
+
     def query_text_and_icd9_code(self):
         query = """
             SELECT n.text, d.icd9_code
@@ -97,7 +111,6 @@ class MimicDatabase:
             AND d.hadm_id = n.hadm_id
             AND n.category = %s
             AND d.icd9_code IN %s
-            LIMIT 10
         """
         self.execute_query(query, [self.category, tuple(self.top_icd9_codes)])
 
@@ -120,3 +133,4 @@ if __name__ == '__main__':
     print('Total discharge summaries:', database.count_discharge_summaries)
     print('# Distinct Subject ids:', database.count_subject_ids)
     print('# Distinct Hadm ids:', database.count_hadm_ids)
+    print('# Distinct labels:', database.count_icd9_codes)
