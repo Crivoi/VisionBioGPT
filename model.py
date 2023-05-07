@@ -24,13 +24,8 @@ class BioGptForSequenceClassification(nn.Module):
         outputs = self.softmax(outputs)
         return outputs
 
-    def to(self, device):
-        self.biogpt.to(device)
-
 
 if __name__ == '__main__':
-    # def _get_output():
-
     train_loader = mimic_loader.get('train')
     model = BioGptForSequenceClassification()
     for idx, item in enumerate(train_loader):
@@ -39,5 +34,6 @@ if __name__ == '__main__':
         prediction = torch.argmax(output, dim=-1)
         for out in prediction:
             natural_output = TextProcessor.decode(out)
+            print(natural_output)
         if idx == 0:
             break

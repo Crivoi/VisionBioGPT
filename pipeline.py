@@ -1,31 +1,10 @@
 import torch
 from torch import nn
 from tqdm import tqdm
-from transformers import TrainingArguments, Trainer, BioGptForCausalLM, BioGptTokenizer
 
 import settings
 from dataset import mimic_loader
 from model import BioGptForSequenceClassification
-
-
-# from model import model
-
-# training_args: TrainingArguments = TrainingArguments(
-#     output_dir='./results',
-#     learning_rate=2e-5,
-#     per_device_train_batch_size=mimic_dataset.batch_size,
-#     per_device_eval_batch_size=mimic_dataset.batch_size,
-#     num_train_epochs=5,
-#     weight_decay=0.01,
-# )
-#
-# trainer: Trainer = Trainer(
-#     model=model,
-#     args=training_args,
-#     train_dataset=train_loader,
-#     eval_dataset=test_loader,
-#     tokenizer=model.tokenizer,
-# )
 
 
 class BioGptTrainer:

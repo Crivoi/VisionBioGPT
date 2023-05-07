@@ -7,6 +7,7 @@ from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler
 
 from database import MimicDatabase
 from preprocessing import TextProcessor
+from settings import BATCH_SIZE, DEVICE
 
 
 class MimicDataset(Dataset):
@@ -32,16 +33,11 @@ class MimicDataset(Dataset):
         input_ids = self.encode_tokens(tokenized)
         label_ids = self.encode_tokens(labels)
 
-        # tokenized = pad_sequence(tokenized)
-
         return input_ids, label_ids
 
     def encode_tokens(self, tokens):
-        return torch.stack(pad_sequence([TextProcessor.encode(t)
-                                         for t in tokens]).view((self.batch_size, -1)))
-
-    def collate(self, input_ids):
-        return pad_sequence(input_ids, batch_first=True)
+        return pad_sequence([TextProcessor.encode(t)
+                             for t in tokens]).view((self.batch_size, -1)).to(DEVICE)
 
 
 def train_test_split(dataset: MimicDataset, train_ratio: float = .8) -> Dict[str, DataLoader]:
@@ -57,7 +53,7 @@ def train_test_split(dataset: MimicDataset, train_ratio: float = .8) -> Dict[str
     return dict(train=train_loader, test=test_loader)
 
 
-mimic_dataset: MimicDataset = MimicDataset(batch_size=8)
+mimic_dataset: MimicDataset = MimicDataset(batch_size=BATCH_SIZE)
 mimic_loader: Dict[str, DataLoader] = train_test_split(mimic_dataset)
 
 if __name__ == '__main__':
