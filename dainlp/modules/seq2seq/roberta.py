@@ -2,6 +2,7 @@ import torch, transformers
 from dainlp.modules.seq2seq.bert import PreTrainedModel
 from dainlp.modules.seq2seq.utils import TransformerLayerList
 from dainlp.modules.embeddings.roberta import RobertaEmbeddings
+from transformers import RobertaModel
 
 
 # [2021-07-08] https://github.com/huggingface/transformers/blob/v4.8.2/src/transformers/models/roberta/modeling_roberta.py#L580

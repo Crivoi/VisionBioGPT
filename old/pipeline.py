@@ -4,7 +4,6 @@ from tqdm import tqdm
 
 import settings
 from dataset import mimic_loader
-from model import BioGptForSequenceClassification
 
 
 class BioGptTrainer:
@@ -50,6 +49,6 @@ class BioGptTrainer:
 
 
 if __name__ == '__main__':
-    model = BioGptForSequenceClassification()
+    model = BioGptForLongDocumentClassification()
     trainer = BioGptTrainer(model=model, train_loader=mimic_loader.get('train'))
     trainer.train()

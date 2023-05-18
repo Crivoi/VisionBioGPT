@@ -1,9 +1,15 @@
-import logging, os, re, torch, transformers
-from dainlp.modules import ModuleUtilsMixin
-from dainlp.modules.seq2seq.utils import TransformerLayerList
-from dainlp.modules.embeddings.bert import BertEmbeddings
-from transformers import BertConfig
+import logging
+import os
+import re
+import torch
+import transformers
+from torch import nn
 
+from transformers import BertConfig, BioGptConfig, BioGptModel
+
+from dainlp.modules import ModuleUtilsMixin
+from dainlp.modules.embeddings.bert import BertEmbeddings
+from dainlp.modules.seq2seq.utils import TransformerLayerList
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +48,7 @@ class PreTrainedModel(torch.nn.Module, ModuleUtilsMixin):
 
     def get_output_embeddings(self):
         return None
-        
+
     def tie_weights(self):
         output_embeddings = self.get_output_embeddings()
         if output_embeddings is not None and self.config.tie_word_embeddings:
@@ -103,7 +109,7 @@ class PreTrainedModel(torch.nn.Module, ModuleUtilsMixin):
 
     @classmethod
     def from_pretrained(cls, pretrained_dir, config):
-        assert os.path.isdir(pretrained_dir)
+        # assert os.path.isdir(pretrained_dir)
         config.name_or_path = pretrained_dir
         with transformers.modeling_utils.no_init_weights(_enable=True):
             model = cls(config)
@@ -124,8 +130,10 @@ class PreTrainedModel(torch.nn.Module, ModuleUtilsMixin):
         old_keys, new_keys = [], []
         for key in state_dict.keys():
             new_key = None
-            if "gamma" in key: new_key = key.replace("gamma", "weight")
-            if "beta" in key: new_key = key.replace("beta", "bias")
+            if "gamma" in key:
+                new_key = key.replace("gamma", "weight")
+            if "beta" in key:
+                new_key = key.replace("beta", "bias")
             if new_key:
                 old_keys.append(key)
                 new_keys.append(new_key)
@@ -138,8 +146,8 @@ class PreTrainedModel(torch.nn.Module, ModuleUtilsMixin):
 
         has_prefix_module = any(s.startswith(prefix) for s in loaded_keys)
         expects_prefix_module = any(s.startswith(prefix) for s in expected_keys)
-        remove_prefix = not has_prefix_module and expects_prefix_module # copy model without prefix to model with prefix
-        add_prefix = has_prefix_module and not expects_prefix_module # copy model with prefix to model without prefix
+        remove_prefix = not has_prefix_module and expects_prefix_module  # copy model without prefix to model with prefix
+        add_prefix = has_prefix_module and not expects_prefix_module  # copy model with prefix to model without prefix
         if remove_prefix:
             expected_keys = [".".join(s.split(".")[1:]) if s.startswith(prefix) else s for s in expected_keys]
         elif add_prefix:
@@ -163,6 +171,7 @@ class PreTrainedModel(torch.nn.Module, ModuleUtilsMixin):
         if metadata is not None: state_dict._metadata = metadata
 
         error_msgs = []
+
         # PyTorch's _load_from_state_dict does not copy parameters in a module's descendants, so need this recursion
         def load(module, prefix=""):
             local_metadata = {} if metadata is None else metadata.get(prefix[:-1], {})
@@ -253,4 +262,4 @@ class BertModel(BertPreTrainedModel):
         embedding_output = self.embeddings(input_ids=input_ids, token_type_ids=token_type_ids)
         encoder_outputs = self.encoder(embedding_output, attention_mask=extended_attention_mask,
                                        head_mask=extended_head_mask)
-        return encoder_outputs # (batch_size, sequence_length, hidden_size)
+        return encoder_outputs  # (batch_size, sequence_length, hidden_size)

@@ -4,7 +4,7 @@ from typing import Union
 import psycopg2
 from psycopg2 import sql
 
-from settings import POSTGRES_DB_NAME, POSTGRES_USERNAME, POSTGRES_PASSWORD
+from settings.__init__ import POSTGRES_DB_NAME, POSTGRES_USERNAME, POSTGRES_PASSWORD
 
 
 class MimicDatabase:

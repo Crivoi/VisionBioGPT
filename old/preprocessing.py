@@ -3,7 +3,7 @@ from typing import Union, List
 from nltk import RegexpTokenizer
 from transformers import BioGptTokenizer
 
-from settings import MIMIC_MAX_LENGTH
+from settings.__init__ import MAX_SEQ_LENGTH
 
 
 class TextProcessor:
@@ -15,7 +15,7 @@ class TextProcessor:
         return cls.regexp_tokenizer.tokenize(text.lower())
 
     @classmethod
-    def encode(cls, text: Union[List[str], str], padding: str = 'max_length', max_length: int = MIMIC_MAX_LENGTH,
+    def encode(cls, text: Union[List[str], str], padding: str = 'max_length', max_length: int = MAX_SEQ_LENGTH,
                truncation: bool = True):
         return cls.biogpt_tokenizer.encode(text, padding=padding, max_length=max_length, truncation=truncation,
                                            return_tensors='pt')

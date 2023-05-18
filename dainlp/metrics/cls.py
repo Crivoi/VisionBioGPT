@@ -1,11 +1,11 @@
 import logging, numpy
 from dainlp.metrics.utils import F_Score, auc_metrics, precision_at_k
 
-
 logger = logging.getLogger(__name__)
 
-
 '''[20220330]'''
+
+
 class Metric:
     def __init__(self, idx2label=None, task_name="singlelabel"):
         self.task_name = task_name

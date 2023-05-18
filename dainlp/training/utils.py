@@ -3,12 +3,12 @@ from collections.abc import Mapping
 from dainlp.utils.files import remove_checkpoints
 from dainlp.utils.tensors import nested_detach
 
-
 logger = logging.getLogger(__name__)
-
 
 '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L1528
     A state_dict is simply a Python dictionary object that maps each layer to its parameter tensor'''
+
+
 def load_state_dict_in_model(model, state_dict):
     load_result = model.load_state_dict(state_dict, strict=False)
     if len(load_result.missing_keys) != 0:
@@ -22,6 +22,8 @@ def load_state_dict_in_model(model, state_dict):
     Save the model (tokenizer, training_args) using save_pretrained or torch.save
     Will only save from the main process.
     Do not consider TPU, SageMaker (Amazon), Sharded (Microsoft), DeepSpeed (Microsoft); do not push to the Hub'''
+
+
 def save_model(model, output_dir, tokenizer, args):
     if not args.should_save: return
     os.makedirs(output_dir, exist_ok=True)
@@ -41,6 +43,8 @@ def save_model(model, output_dir, tokenizer, args):
 
 '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L566
     Don't consider group_by_length'''
+
+
 def get_train_sampler(train_dataset, args):
     assert isinstance(train_dataset, collections.abc.Sized)
     if args.world_size <= 1:
@@ -54,6 +58,8 @@ def get_train_sampler(train_dataset, args):
 
 '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L630
     train_dataset has __len__ and it is not a datasets.Dataset'''
+
+
 def get_train_dataloader(train_dataset, collate_fn, args):
     train_sampler = get_train_sampler(train_dataset, args)
     return torch.utils.data.DataLoader(train_dataset, batch_size=args.train_batch_size, sampler=train_sampler,
@@ -61,6 +67,8 @@ def get_train_dataloader(train_dataset, collate_fn, args):
 
 
 '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_pt_utils.py#L641'''
+
+
 class ShardSampler(torch.utils.data.Sampler):
     def __init__(self, dataset, batch_size=1, num_processes=1, process_index=0):
         self.dataset = dataset
@@ -88,6 +96,8 @@ class ShardSampler(torch.utils.data.Sampler):
 '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L705
                  https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L676
                  https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L752'''
+
+
 def get_eval_dataloader(eval_dataset, collate_fn, args):
     if args.world_size <= 1:
         eval_sampler = torch.utils.data.SequentialSampler(eval_dataset)
@@ -99,6 +109,8 @@ def get_eval_dataloader(eval_dataset, collate_fn, args):
 
 
 '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/modeling_utils.py#L2261'''
+
+
 def unwrap_model(model):
     if hasattr(model, "module"):
         return unwrap_model(model.module)
@@ -107,23 +119,27 @@ def unwrap_model(model):
 
 
 '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L989'''
+
+
 def wrap_model(model, args, training=True):
-    if unwrap_model(model) is not model: # already wrapped
-        return model
-    assert args.n_gpu > 0
-    if args.n_gpu > 1:
-        model = torch.nn.DataParallel(model)
-    if not training:
-        return model
-    if args.local_rank != -1:
-        kwargs = {"find_unused_parameters": True}
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank],
-                                                          output_device=args.local_rank, **kwargs)
+    # if unwrap_model(model) is not model:  # already wrapped
+    #     return model
+    # assert args.n_gpu > 0
+    # if args.n_gpu > 1:
+    #     model = torch.nn.DataParallel(model)
+    # if not training:
+    #     return model
+    # if args.local_rank != -1:
+    #     kwargs = {"find_unused_parameters": True}
+    #     model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank],
+    #                                                       output_device=args.local_rank, **kwargs)
     return model
 
 
 '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L1869
     Take care of a tensor or a nested list/dictionary of tensors'''
+
+
 def prepare_input(data, device):
     if isinstance(data, Mapping):
         return type(data)({k: prepare_input(v, device) for k, v in data.items()})
@@ -137,6 +153,8 @@ def prepare_input(data, device):
 
 '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L1613
     Do not save optimizer and scheduler; do not save RNG state'''
+
+
 def save_checkpoint(model, tokenizer, args, state, metrics=None):
     checkpoint_folder = os.path.join(args.output_dir, f"checkpoint-{state.global_step}")
     # TODO: self.store_flos()
@@ -159,6 +177,8 @@ def save_checkpoint(model, tokenizer, args, state, metrics=None):
 
 
 '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L2521'''
+
+
 def prediction_step(model, inputs, device):
     assert "labels" in inputs
     inputs = prepare_input(inputs, device)
@@ -175,6 +195,8 @@ def prediction_step(model, inputs, device):
 
 '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L1913
                  do_grad_scaling is True, using fp16 and amp'''
+
+
 def training_step(model, inputs, scaler, args):
     model.train()
     inputs = prepare_input(inputs, args.device)

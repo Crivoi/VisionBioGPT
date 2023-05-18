@@ -11,7 +11,7 @@ import dainlp
 from dainlp.data.cls import Dataset
 from dainlp.data.cls.hierarchical import Collator
 from dainlp.metrics.cls import Metric
-from dainlp.models.cls.hierarchical import Model
+from dainlp.models.cls.hierarchical import DaiRobertaModel
 from dainlp.training import Trainer
 from dainlp.utils.args import HfArgumentParser, ArgumentsForHiTransformer as Arguments
 from dainlp.utils.print import print_seconds
@@ -47,7 +47,7 @@ def build_trainer(tokenizer, args, idx2label):
     logger.info("*               Build the trainer                *")
     logger.info("**************************************************")
     config = AutoConfig.from_pretrained(args.model_dir)
-    model = Model.from_pretrained(args.model_dir, config=config)
+    model = DaiRobertaModel.from_pretrained(args.model_dir, config=config)
     data_collator = Collator(tokenizer, args.segment_length, args.max_num_segments,
                              args.do_use_stride, args.add_cls_each_segment, args.task_name)
     compute_metrics = Metric(idx2label, args.task_name)

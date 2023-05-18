@@ -7,13 +7,13 @@ from functools import cached_property
 from dainlp.training.optimizer import OptimizerNames
 from dainlp.training.scheduler import SchedulerType
 from dainlp.training.callback import IntervalStrategy
-from transformers.file_utils import torch_required
-
+from settings.__init__ import DEVICE
 
 logger = logging.getLogger(__name__)
 
-
 '''[TODO] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/training_args.py#L1321'''
+
+
 class ParallelMode(Enum):
     DISTRIBUTED = "distributed"
     NOT_PARALLEL = "not_parallel"
@@ -21,6 +21,8 @@ class ParallelMode(Enum):
 
 
 '''[2022-Feb-18] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/hf_argparser.py#L44'''
+
+
 class HfArgumentParser(ArgumentParser):
     def __init__(self, dataclass_types):
         super(HfArgumentParser, self).__init__()
@@ -63,10 +65,12 @@ class HfArgumentParser(ArgumentParser):
                 delattr(namespace, k)
             outputs.append(dtype(**values))
         assert len(namespace.__dict__) == 0
-        return (*outputs, )
+        return (*outputs,)
 
 
 '''[TODO]'''
+
+
 @dataclass
 class ArgumentsBase:
     task_name: str = field(default=None)
@@ -94,6 +98,8 @@ class ArgumentsBase:
 
 
 '''[TODO]'''
+
+
 @dataclass
 class TrainingArguments:
     train_filepath: str = field(default=None)
@@ -127,7 +133,6 @@ class TrainingArguments:
     greater_is_better: bool = field(default=None)
     optim: OptimizerNames = field(default="adamw_hf")
 
-
     @property
     def train_batch_size(self):
         return self.per_device_train_batch_size * max(1, self.n_gpu)
@@ -142,12 +147,16 @@ class TrainingArguments:
 
 
 '''[TODO]'''
+
+
 @dataclass
 class TestArguments:
     output_predictions_filepath: str = field(default=None)
 
 
 '''[TODO]'''
+
+
 @dataclass
 class TextArguments:
     max_seq_length: int = field(default=512)
@@ -155,6 +164,8 @@ class TextArguments:
 
 
 '''[20220330]'''
+
+
 @dataclass
 class Arguments(ArgumentsBase, TrainingArguments, TestArguments, TextArguments):
     def __post_init__(self):
@@ -189,7 +200,6 @@ class Arguments(ArgumentsBase, TrainingArguments, TestArguments, TextArguments):
 
         self.optim = OptimizerNames(self.optim)
 
-
     def __str__(self):
         self_as_dict = asdict(self)
         attrs_as_str = [f"{k}={v}" for k, v in sorted(self_as_dict.items())]
@@ -198,34 +208,31 @@ class Arguments(ArgumentsBase, TrainingArguments, TestArguments, TextArguments):
     __repr__ = __str__
 
     @cached_property
-    @torch_required
     def _setup_devices(self):
-        assert torch.cuda.is_available()
-        if self.local_rank == -1:
-            device = torch.device("cuda:0")
-            self._n_gpu = torch.cuda.device_count()
-        else:
-            torch.distributed.init_process_group(backend="nccl")
-            device = torch.device("cuda", self.local_rank)
-            self._n_gpu = 1
+        if torch.cuda.is_available():
+            if self.local_rank == -1:
+                device = torch.device("cuda:0")
+                self._n_gpu = torch.cuda.device_count()
+            else:
+                torch.distributed.init_process_group(backend="nccl")
+                device = torch.device("cuda", self.local_rank)
+                self._n_gpu = 1
 
-        assert device.type == "cuda"
-        torch.cuda.set_device(device)
-        return device
+            assert device.type == "cuda"
+            torch.cuda.set_device(device)
+            return device
+        return DEVICE
 
     @property
-    @torch_required
     def device(self):
         return self._setup_devices
 
     @property
-    @torch_required
     def n_gpu(self):
         _ = self._setup_devices
         return self._n_gpu
 
     @property
-    @torch_required
     def parallel_mode(self):
         if self.local_rank != -1:
             return ParallelMode.DISTRIBUTED
@@ -235,21 +242,18 @@ class Arguments(ArgumentsBase, TrainingArguments, TestArguments, TextArguments):
             return ParallelMode.NOT_PARALLEL
 
     @property
-    @torch_required
     def world_size(self):
         if self.local_rank != -1:
             return torch.distributed.get_world_size()
         return 1
 
     @property
-    @torch_required
     def process_index(self):
         if self.local_rank != -1:
             return torch.distributed.get_rank()
         return 0
 
     @property
-    @torch_required
     def local_process_index(self):
         if self.local_rank != -1:
             return self.local_rank
@@ -261,11 +265,16 @@ class Arguments(ArgumentsBase, TrainingArguments, TestArguments, TextArguments):
 
 
 '''[20220330]'''
+
+
 @dataclass
 class ArgumentsForLongformer(Arguments):
     local_size: int = field(default=512)
 
+
 '''[20220330]'''
+
+
 @dataclass
 class ArgumentsForHiTransformer(Arguments):
     segment_length: int = field(default=64)

@@ -1,13 +1,12 @@
 from typing import Dict
 
 import numpy as np
-import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler
 
 from database import MimicDatabase
 from preprocessing import TextProcessor
-from settings import BATCH_SIZE, DEVICE
+from settings.__init__ import BATCH_SIZE, DEVICE
 
 
 class MimicDataset(Dataset):

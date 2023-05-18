@@ -1,11 +1,11 @@
 import json, logging, os, torch
 from filelock import FileLock
 
-
 logger = logging.getLogger(__name__)
 
-
 '''[20220329]'''
+
+
 class Dataset(torch.utils.data.dataset.Dataset):
     def __init__(self, filepath, args, tokenizer=None, split=None, label2idx=None):
         assert (label2idx is not None) or (split == "train")
@@ -56,7 +56,8 @@ class Dataset(torch.utils.data.dataset.Dataset):
         features = []
         for example in examples:
             text = example[text_field]
-            if self.args.do_lower_case: text = text.lower()
+            if self.args.do_lower_case:
+                text = text.lower()
             outputs = tokenizer(text, padding=False, truncation=True, max_length=self.args.max_seq_length)
             feature = {"input_ids": outputs["input_ids"], "labels": self.get_example_label(example)}
             features.append(feature)
@@ -75,6 +76,7 @@ class Dataset(torch.utils.data.dataset.Dataset):
 
 
 '''[20220329]'''
+
 class Collator:
     def __init__(self, tokenizer, max_seq_length, task_name="singlelabel"):
         self.tokenizer = tokenizer
@@ -93,5 +95,3 @@ class Collator:
         else:
             batch["labels"] = torch.tensor([f["labels"] for f in features], dtype=torch.float)
         return batch
-
-

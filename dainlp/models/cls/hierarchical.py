@@ -1,13 +1,19 @@
 import torch
+from torch import nn
+from transformers import BioGptConfig
+
+from dainlp.modules.seq2seq.biogpt import BioGptPreTrainedModel, BioGptModel
 from dainlp.modules.seq2seq.roberta import RobertaPreTrainedModel, RobertaModel
 from dainlp.modules.utils import get_sinusoidal_embeddings
 from dainlp.modules.seq2vec.lwan import MullenbachModel
-
+from settings.__init__ import NUM_LABELS
 
 '''[2022-Mar-13]'''
-class Model(RobertaPreTrainedModel):
+
+
+class DaiRobertaModel(RobertaPreTrainedModel):
     def __init__(self, config):
-        super(Model, self).__init__(config)
+        super(DaiRobertaModel, self).__init__(config)
         self.num_labels = config.num_labels
         self.config = config
         # pre-trained RoBERTa encoder, being able to take care of no longer than 512 wordpieces
@@ -82,3 +88,23 @@ class Model(RobertaPreTrainedModel):
             loss = loss_fct(logits, labels)
 
         return {"loss": loss, "logits": logits}
+
+
+class BioGptForLongDocummentClassification(BioGptPreTrainedModel):
+    def __init__(self, config=None) -> None:
+        super().__init__(config)
+        self.num_labels = NUM_LABELS
+        self.config = config or BioGptConfig()
+        self.biogpt = BioGptModel(self.config)
+        self.linear = nn.Linear(self.config.hidden_size, self.num_labels)
+
+    def forward(self, input_ids, labels=None, **kwargs):
+        outputs = self.biogpt(input_ids.squeeze(), )
+        outputs = self.linear(outputs.last_hidden_state)
+        logits = outputs.permute(0, 2, 1)
+        if labels is not None:
+            loss_fct = nn.BCEWithLogitsLoss()
+            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+            return loss, logits
+        else:
+            return logits

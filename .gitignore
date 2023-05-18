@@ -1,4 +1,8 @@
 .env
 *.jpg
+<<<<<<< HEAD
 dainlp/data/*
 cache/*
+=======
+data/*
+>>>>>>> parent of e8f9e33 (⚒️ Added Xiang Dai code ⚒️)

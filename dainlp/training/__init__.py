@@ -12,11 +12,11 @@ from dainlp.utils.tensors import distributed_broadcast_scalars, denumpify_detens
 from dainlp.utils.print import print_large_integer, speed_metrics, log_remaining_time
 from dainlp.utils.resources import MemoryTracker
 
-
 logger = logging.getLogger(__name__)
 
-
 '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L275'''
+
+
 class Trainer:
     def __init__(self, model, args, data_collator, train_dataset=None, eval_dataset=None, tokenizer=None,
                  compute_metrics=None, callbacks=None):
@@ -52,15 +52,16 @@ class Trainer:
         self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
         self._memory_tracker.stop_and_update_metrics()
 
-
     '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L1060'''
+
     def train(self):
         model, start_time, num_train_epochs, num_train_samples, train_dataloader = self.before_training()
 
         for epoch in range(num_train_epochs):
-            if epoch > 0: log_remaining_time(epoch, num_train_epochs, start_time, prefix="Epoch ")
-            if isinstance(train_dataloader, torch.utils.data.DataLoader) and isinstance(train_dataloader.sampler,
-                                                                                        torch.utils.data.distributed.DistributedSampler):
+            if epoch > 0:
+                log_remaining_time(epoch, num_train_epochs, start_time, prefix="Epoch ")
+            if isinstance(train_dataloader, torch.utils.data.DataLoader) \
+                    and isinstance(train_dataloader.sampler, torch.utils.data.distributed.DistributedSampler):
                 train_dataloader.sampler.set_epoch(epoch)
             self.control = self.callback_handler.on_epoch_begin(self.args, self.state, self.control)
 
@@ -80,8 +81,8 @@ class Trainer:
         metrics = self.after_training(start_time, num_train_samples)
         return metrics
 
-
     '''[2022-Mar-16]'''
+
     def before_training(self):
         self._memory_tracker.start()
         self.is_in_train = True
@@ -132,26 +133,28 @@ class Trainer:
         self.control = self.callback_handler.on_train_begin(self.args, self.state, self.control)
         return model, start_time, num_train_epochs, num_train_samples, train_dataloader
 
-
     '''[2022-Mar-10]'''
+
     def train_loop(self, epoch_iterator, model, epoch):
         for step, inputs in enumerate(epoch_iterator):
             if step % self.args.gradient_accumulation_steps == 0:
                 self.control = self.callback_handler.on_step_begin(self.args, self.state, self.control)
 
-            if (((step + 1) % self.args.gradient_accumulation_steps != 0) and self.args.local_rank != -1):
+            if ((step + 1) % self.args.gradient_accumulation_steps != 0) and self.args.local_rank != -1:
                 with model.no_sync():
                     tr_loss_step = training_step(model, inputs, self.scaler, self.args)
             else:
                 tr_loss_step = training_step(model, inputs, self.scaler, self.args)
 
             if torch.isnan(tr_loss_step) or torch.isinf(tr_loss_step):
-                self.total_train_loss += self.total_train_loss / (1 + self.state.global_step - self._globalstep_last_logged)
+                self.total_train_loss += self.total_train_loss / (
+                        1 + self.state.global_step - self._globalstep_last_logged)
             else:
                 self.total_train_loss += tr_loss_step
 
             self.current_flos += float(
-                self.model.floating_point_ops(inputs) if hasattr(self.model, "floating_point_ops") and "input_ids" in inputs else 0)
+                self.model.floating_point_ops(inputs) if hasattr(self.model,
+                                                                 "floating_point_ops") and "input_ids" in inputs else 0)
 
             if (step + 1) % self.args.gradient_accumulation_steps == 0 or (
                     (step + 1 == len(epoch_iterator)) and len(epoch_iterator) <= self.args.gradient_accumulation_steps):
@@ -179,8 +182,8 @@ class Trainer:
             if self.control.should_epoch_stop or self.control.should_training_stop:
                 break
 
-
     '''[2022-Mar-10]'''
+
     def after_training(self, start_time, num_train_samples):
         if self.state.best_model_checkpoint is not None:
             if self.args.local_rank != -1:
@@ -205,8 +208,8 @@ class Trainer:
         if self.args.local_process_index == 0:
             move_best_checkpoint(self.args.output_dir, self.state.best_model_checkpoint)
 
-
     '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L2111'''
+
     def store_flos(self):
         if self.args.local_rank != -1:
             self.state.total_flos += (distributed_broadcast_scalars([self.current_flos], self.args.device).sum().item())
@@ -215,8 +218,8 @@ class Trainer:
             self.state.total_flos += self.current_flos
             self.current_flos = 0
 
-
     '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L2299'''
+
     def evaluation_loop(self, dataloader, prefix="eval"):
         model = wrap_model(self.model, self.args, training=False)
         batch_size = dataloader.batch_size
@@ -257,16 +260,16 @@ class Trainer:
 
         return {"logits": cpu_logits, "metrics": metrics, "golds": cpu_golds}
 
-
     '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L2171'''
+
     def evaluate(self, eval_dataset, prefix="eval"):
         metrics = self.predict(eval_dataset, prefix)["metrics"]
         self.log(metrics)
         self.control = self.callback_handler.on_evaluate(self.args, self.state, self.control, metrics)
         return metrics
 
-
     '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L2240'''
+
     def predict(self, test_dataset, metric_key_prefix="test"):
         self._memory_tracker.start()
         test_dataloader = get_eval_dataloader(test_dataset, self.data_collator, self.args)
@@ -278,17 +281,17 @@ class Trainer:
         self._memory_tracker.stop_and_update_metrics(outputs["metrics"])
         return outputs
 
-
     '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L1852'''
+
     def log(self, logs):
         if self.state.epoch is not None:
             logs["epoch"] = round(self.state.epoch, 2)
         self.state.log_history.append({**logs, **{"step": self.state.global_step}})
         self.control = self.callback_handler.on_log(self.args, self.state, self.control, logs)
 
-
     '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L1541
                      https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_pt_utils.py#L797'''
+
     def _maybe_log_save_evaluate(self, loss, model):
         if self.control.should_log:
             logs = {}
