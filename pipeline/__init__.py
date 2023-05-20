@@ -92,7 +92,6 @@ class Trainer:
                 if i < 10:
                     print('\n')
                     print(preds)
-                    # print([self.idx2label[x.item()] for x in preds])
                     print(ground_truth)
                     print(preds.shape, ground_truth.shape)
                     i += 1

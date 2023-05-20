@@ -1,6 +1,6 @@
 import collections, logging, math, numpy, os, torch
 from collections.abc import Mapping
-from dainlp.utils.files import remove_checkpoints
+from settings.files import remove_checkpoints
 from dainlp.utils.tensors import nested_detach
 
 logger = logging.getLogger(__name__)

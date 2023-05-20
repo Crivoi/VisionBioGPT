@@ -1,6 +1,6 @@
 import datetime, json, logging, numpy, os, sys, time
 from collections import defaultdict
-from dainlp.utils.files import make_sure_parent_dir_exists
+from settings.files import make_sure_parent_dir_exists
 
 
 logger = logging.getLogger(__name__)

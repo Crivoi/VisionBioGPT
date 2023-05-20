@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class MimicDataset(Dataset):
     task_name: str = 'multilabel'
-    data_path: str = os.path.join('./dainlp/data/50')
+    data_path: str = os.path.join('../data/50')
     do_lower_case: bool = False
     max_seq_length: int = settings.MAX_SEQ_LENGTH
 
@@ -132,7 +132,8 @@ def build_dataloader(dataset, collate_fn):
         dataset,
         batch_size=settings.BATCH_SIZE,
         sampler=train_sampler,
-        collate_fn=collate_fn, pin_memory=True
+        collate_fn=collate_fn,
+        pin_memory=True
     )
 
 

@@ -6,7 +6,7 @@ from dainlp.training.utils import load_state_dict_in_model, save_checkpoint, wra
 from dainlp.training.callback import TrainerState
 from dainlp.training.scheduler import create_scheduler
 from dainlp.utils import set_seed
-from dainlp.utils.files import move_best_checkpoint
+from settings.files import move_best_checkpoint
 from dainlp.utils.tensors import nested_gather, nested_truncate, nested_numpify, nested_concat
 from dainlp.utils.tensors import distributed_broadcast_scalars, denumpify_detensorize, pad_across_processes
 from dainlp.utils.print import print_large_integer, speed_metrics, log_remaining_time

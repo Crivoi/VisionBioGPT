@@ -4,7 +4,7 @@ import numpy as np
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler
 
-from database import MimicDatabase
+from dataset.database import MimicDatabase
 from preprocessing import TextProcessor
 from settings.__init__ import BATCH_SIZE, DEVICE
 

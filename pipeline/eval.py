@@ -5,18 +5,19 @@ import os
 import sys
 import time
 
-from transformers import AutoTokenizer, AutoConfig
+from transformers import BioGptForSequenceClassification, BioGptConfig, BioGptTokenizer
 
 import dainlp
-from data.cls import Dataset
-from data.cls.hierarchical import Collator
+import settings
 from dainlp.metrics.cls import Metric
-from dainlp.models.cls.hierarchical import DaiRobertaModel
 from dainlp.training import Trainer
 from dainlp.utils.args import HfArgumentParser, ArgumentsForHiTransformer as Arguments
 from dainlp.utils.print import print_seconds
+from dataset import MimicDataset, Collator
+from settings.files import write_object_to_json_file
+from settings.utils import Splits
 
-sys.path.insert(0, "../")
+sys.path.insert(0, "/")
 logger = logging.getLogger(__name__)
 
 
@@ -25,7 +26,6 @@ def parse_args():
     args = parser.parse_args_into_dataclasses()[0]
     args._setup_devices
     dainlp.utils.print.set_logging_format(os.path.join(args.output_dir, "eval.log"))
-    logger.info(f"DaiNLP {dainlp.__version__}")
     logger.info(args)
     return args
 
@@ -34,25 +34,36 @@ def load_data(args):
     logger.info("**************************************************")
     logger.info("*               Load the datasets                *")
     logger.info("**************************************************")
-    tokenizer = AutoTokenizer.from_pretrained(args.model_dir, use_fast=True)
-    idx2label = json.load(open(os.path.join(args.model_dir, "config.json")))["id2label"]
-    idx2label = {int(k): v for k, v in idx2label.items()}
-    label2idx = {v: k for k, v in idx2label.items()}
-    test_dataset = Dataset(args.test_filepath, args, tokenizer, split="test", label2idx=label2idx)
+    tokenizer = BioGptTokenizer.from_pretrained(args.model_dir, use_fast=True)
+
+    train_dataset = MimicDataset(
+        tokenizer=tokenizer,
+        split=Splits.train.value,
+        cache_dir=args.cache_dir
+    )
+
+    idx2label = {v: k for k, v in train_dataset.label2idx.items()}
+    test_dataset = MimicDataset(
+        tokenizer=tokenizer,
+        split=Splits.test.value,
+        label2idx=train_dataset.label2idx,
+        cache_dir=args.cache_dir,
+    )
     return tokenizer, test_dataset, idx2label
 
 
 def build_trainer(tokenizer, args, idx2label):
-    logger.info("**************************************************")
-    logger.info("*               Build the trainer                *")
-    logger.info("**************************************************")
-    config = AutoConfig.from_pretrained(args.model_dir)
-    model = DaiRobertaModel.from_pretrained(args.model_dir, config=config)
-    data_collator = Collator(tokenizer, args.segment_length, args.max_num_segments,
-                             args.do_use_stride, args.add_cls_each_segment, args.task_name)
-    compute_metrics = Metric(idx2label, args.task_name)
+    if args.should_log:
+        logger.info("**************************************************")
+        logger.info("*               Build the trainer                *")
+        logger.info("**************************************************")
 
+    config = BioGptConfig.from_pretrained(settings.BIOGPT_CHECKPOINT, num_labels=settings.NUM_LABELS)
+    model = BioGptForSequenceClassification.from_pretrained(settings.BIOGPT_CHECKPOINT, config=config)
+    compute_metrics = Metric(idx2label, args.task_name)
+    data_collator = Collator(tokenizer=tokenizer, max_seq_length=settings.MAX_SEQ_LENGTH)
     trainer = Trainer(model=model, args=args, data_collator=data_collator, compute_metrics=compute_metrics)
+
     return trainer
 
 
@@ -64,11 +75,16 @@ def main():
 
     if args.output_predictions_filepath is not None:
         preds = Metric.get_labels_from_logitis(test_outputs["logits"], idx2label, args.task_name)
-        dainlp.utils.files.write_object_to_json_file(preds, args.output_predictions_filepath)
+        write_object_to_json_file(preds, args.output_predictions_filepath)
 
     args.complete_running_time = print_seconds(time.time() - args.init_args_time)
-    dainlp.utils.files.write_object_to_json_file(
-        {"args": dataclasses.asdict(args), "test_metrics": test_outputs["metrics"]}, args.output_metrics_filepath)
+    write_object_to_json_file(
+        dict(
+            args=dataclasses.asdict(args),
+            test_metrics=test_outputs["metrics"],
+            filepath=args.output_metrics_filepath
+        )
+    )
 
 
 if __name__ == "__main__":
