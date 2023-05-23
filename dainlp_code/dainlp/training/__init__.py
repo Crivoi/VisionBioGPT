@@ -1,129 +1,23 @@
-import collections
-import logging
-import math
-import os
-import time
-import torch
-from typing import Dict
-
-import numpy as np
-from matplotlib import pyplot as plt
-from torch import nn
-from torch.optim import AdamW
-from torch.optim import Optimizer
-from torch.utils.data import DataLoader
-from tqdm import tqdm
-from transformers import get_scheduler, BioGptForSequenceClassification
-
-import settings
-
-from pipeline.callback import DefaultFlowCallback, CallbackHandler, TrainerControl
-from pipeline.callback import TrainerState
+import collections, logging, math, os, time, torch
 from pipeline.optimizer import create_optimizer
-from pipeline.scheduler import create_scheduler
+from pipeline.callback import DefaultFlowCallback, CallbackHandler, TrainerControl
 from pipeline.utils import get_eval_dataloader, get_train_dataloader, training_step, prediction_step
 from pipeline.utils import load_state_dict_in_model, save_checkpoint, wrap_model
-from settings.utils import set_seed
+from pipeline.callback import TrainerState
+from pipeline.scheduler import create_scheduler
+from dainlp_code.dainlp.utils import set_seed
+from settings.files import move_best_checkpoint
+from settings.tensors import nested_gather, nested_truncate, nested_numpify, nested_concat
+from settings.tensors import distributed_broadcast_scalars, denumpify_detensorize, pad_across_processes
 from settings.print import print_large_integer, speed_metrics, log_remaining_time
 from settings.resources import MemoryTracker
-from settings.tensors import distributed_broadcast_scalars, denumpify_detensorize, pad_across_processes
-from settings.tensors import nested_gather, nested_truncate, nested_numpify, nested_concat
-from settings.files import move_best_checkpoint
 
 logger = logging.getLogger(__name__)
 
-
-class CustomTrainer:
-    model: nn.Module
-    num_epochs: int = 1
-    optimizer: Optimizer
-
-    def __init__(
-            self,
-            model: BioGptForSequenceClassification,
-            train_loader: DataLoader,
-            dev_loader: DataLoader,
-            label2idx: Dict
-    ) -> None:
-        self.model = model
-        self.train_loader = train_loader
-        self.dev_loader = dev_loader
-        self.optimizer = AdamW(self.model.parameters(), lr=5e-5)
-        self.label2idx = label2idx
-        self.idx2label = {v: k for k, v in self.label2idx.items()}
-        self.num_training_steps = self.num_epochs * len(self.train_loader)
-        self.lr_scheduler = get_scheduler(
-            name="linear",
-            optimizer=self.optimizer,
-            num_warmup_steps=0,
-            num_training_steps=self.num_training_steps
-        )
-        self.progress_bar = tqdm(range(self.num_training_steps))
-
-    def train_iteration(self, input_ids, labels, attention_mask):
-        self.model.zero_grad()
-
-        output = self.model(input_ids=input_ids, labels=labels, attention_mask=attention_mask)
-
-        loss = output.loss
-        loss.backward()
-
-        self.optimizer.step()
-        self.lr_scheduler.step()
-        self.progress_bar.update(1)
-
-        return loss.item()
-
-    def train(self, plot=True):
-        self.model.train()
-
-        plot_loss_total = 0
-        plot_losses = []
-        for epoch in range(self.num_epochs):
-            for idx, batch in enumerate(self.train_loader):
-                batch = {k: v.to(settings.DEVICE) for k, v in batch.items()}
-                loss = self.train_iteration(**batch)
-                plot_loss_total += loss
-                plot_loss_avg = plot_loss_total / 100
-                plot_losses.append(plot_loss_avg)
-                plot_loss_total = 0
-
-        if plot:
-            plt.figure()
-            fig, ax = plt.subplots()
-            ax.plot(plot_losses)
-            plt.show()
-
-    def evaluate(self):
-        self.model.eval()
-
-        n_correct = []
-        i = 0
-        with torch.no_grad():
-            for batch in tqdm(self.dev_loader, desc="Evaluating"):
-                logits = self.model(**batch).logits
-
-                # preds = torch.arange(0, logits.shape[-1])[torch.sigmoid(logits).squeeze(dim=0) > 0.5]
-                preds = torch.arange(0, logits.shape[0] * logits.shape[1]).reshape(logits.shape)[
-                    torch.sigmoid(logits).squeeze(dim=0) > 0.5].reshape(8, -1)
-                ground_truth = batch['labels']
-                if i < 10:
-                    print('\n')
-                    print(preds)
-                    print(ground_truth)
-                    print(preds.shape, ground_truth.shape)
-                    i += 1
-
-                n_correct.append(np.all(preds == ground_truth))
-        accuracy = np.mean(n_correct)
-
-        self.model.train()
-        return accuracy
+'''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L275'''
 
 
 class Trainer:
-    """[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L275"""
-
     def __init__(self, model, args, data_collator, train_dataset=None, eval_dataset=None, tokenizer=None,
                  compute_metrics=None, callbacks=None):
         self.args = args
@@ -311,10 +205,8 @@ class Trainer:
         self.log(metrics)
         self.control = self.callback_handler.on_train_end(self.args, self.state, self.control)
 
-        # if self.args.local_process_index == 0:
-        #     move_best_checkpoint(self.args.output_dir, self.state.best_model_checkpoint)
-
-        return metrics
+        if self.args.local_process_index == 0:
+            move_best_checkpoint(self.args.output_dir, self.state.best_model_checkpoint)
 
     '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L2111'''
 

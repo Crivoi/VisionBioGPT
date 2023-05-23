@@ -1,5 +1,4 @@
 import dataclasses
-import json
 import logging
 import os
 import sys
@@ -7,15 +6,14 @@ import time
 
 from transformers import BioGptForSequenceClassification, BioGptConfig, BioGptTokenizer
 
-import dainlp
 import settings
-from dainlp.metrics.cls import Metric
-from dainlp.training import Trainer
-from dainlp.utils.args import HfArgumentParser, ArgumentsForHiTransformer as Arguments
-from dainlp.utils.print import print_seconds
+from metrics import Metric
+from pipeline import Trainer
+from settings.args import HfArgumentParser, ArgumentsForHiTransformer as Arguments
 from dataset import MimicDataset, Collator
 from settings.files import write_object_to_json_file
 from settings.utils import Splits
+from settings.print import print_seconds, set_logging_format
 
 sys.path.insert(0, "/")
 logger = logging.getLogger(__name__)
@@ -23,9 +21,9 @@ logger = logging.getLogger(__name__)
 
 def parse_args():
     parser = HfArgumentParser([Arguments])
-    args = parser.parse_args_into_dataclasses()[0]
+    args: Arguments = parser.parse_args_into_dataclasses()[0]
     args._setup_devices
-    dainlp.utils.print.set_logging_format(os.path.join(args.output_dir, "eval.log"))
+    set_logging_format(os.path.join(args.output_dir, "eval.log"))
     logger.info(args)
     return args
 
@@ -34,12 +32,12 @@ def load_data(args):
     logger.info("**************************************************")
     logger.info("*               Load the datasets                *")
     logger.info("**************************************************")
-    tokenizer = BioGptTokenizer.from_pretrained(args.model_dir, use_fast=True)
+    tokenizer = BioGptTokenizer.from_pretrained(settings.BIOGPT_CHECKPOINT, use_fast=True)
 
     train_dataset = MimicDataset(
         tokenizer=tokenizer,
         split=Splits.train.value,
-        cache_dir=args.cache_dir
+        cache_dir=settings.CACHE_DIR
     )
 
     idx2label = {v: k for k, v in train_dataset.label2idx.items()}
@@ -47,7 +45,7 @@ def load_data(args):
         tokenizer=tokenizer,
         split=Splits.test.value,
         label2idx=train_dataset.label2idx,
-        cache_dir=args.cache_dir,
+        cache_dir=settings.CACHE_DIR,
     )
     return tokenizer, test_dataset, idx2label
 
@@ -59,7 +57,7 @@ def build_trainer(tokenizer, args, idx2label):
         logger.info("**************************************************")
 
     config = BioGptConfig.from_pretrained(settings.BIOGPT_CHECKPOINT, num_labels=settings.NUM_LABELS)
-    model = BioGptForSequenceClassification.from_pretrained(settings.BIOGPT_CHECKPOINT, config=config)
+    model = BioGptForSequenceClassification.from_pretrained(args.model_dir, config=config)
     compute_metrics = Metric(idx2label, args.task_name)
     data_collator = Collator(tokenizer=tokenizer, max_seq_length=settings.MAX_SEQ_LENGTH)
     trainer = Trainer(model=model, args=args, data_collator=data_collator, compute_metrics=compute_metrics)

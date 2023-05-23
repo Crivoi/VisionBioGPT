@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class MimicDataset(Dataset):
     task_name: str = 'multilabel'
-    data_path: str = os.path.join('../data/50')
+    data_path: str = os.path.join(settings.DATA_DIR)
     do_lower_case: bool = False
     max_seq_length: int = settings.MAX_SEQ_LENGTH
 
@@ -76,8 +76,10 @@ class MimicDataset(Dataset):
             if self.do_lower_case:
                 text = text.lower()
             outputs = tokenizer(
-                text, padding='max_length',
-                truncation=True, max_length=self.max_seq_length
+                text,
+                padding='max_length',
+                truncation=True,
+                max_length=self.max_seq_length
             )
             feature = dict(
                 input_ids=outputs["input_ids"],

@@ -52,7 +52,8 @@ def move_best_checkpoint(output_dir, best_checkpoint):
     for filename in os.listdir(best_checkpoint):
         shutil.move(f"{best_checkpoint}/{filename}", f"{output_dir}/{filename}")
     for checkpoint in os.listdir(output_dir):
-        if checkpoint.startswith("checkpoint"): shutil.rmtree(f"{output_dir}/{checkpoint}")
+        if checkpoint.startswith("checkpoint"):
+            shutil.rmtree(f"{output_dir}/{checkpoint}")
 
 
 '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L2146'''
