@@ -4,6 +4,8 @@ import random
 import torch
 from enum import Enum
 
+logger = logging.getLogger(__name__)
+
 
 class Splits(Enum):
     train = 'train'
@@ -11,12 +13,14 @@ class Splits(Enum):
     test = 'test'
 
 
-logger = logging.getLogger(__name__)
-
-'''[2022-Feb-17] https://github.com/LorrinWWW/Pyramid/blob/master/utils/data.py#L327'''
+class DataSamples(Enum):
+    sample = 'sample'
+    top50 = '50'
+    full = 'full'
 
 
 def pad_sequences(sequences, max_length=None, dtype="int32", value=0):
+    """[2022-Feb-17] https://github.com/LorrinWWW/Pyramid/blob/master/utils/data.py#L327"""
     batch_size = len(sequences)
     if max_length is None:
         max_length = max([len(s) for s in sequences])
@@ -31,10 +35,8 @@ def pad_sequences(sequences, max_length=None, dtype="int32", value=0):
     return padded_sequences
 
 
-'''[2022-Feb-17] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_utils.py#L50'''
-
-
 def set_seed(seed=52):
+    """[2022-Feb-17] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_utils.py#L50"""
     """Fix the random seed for reproducibility"""
     if seed < 0: return
     logger.debug(f"Random seed: {seed}")

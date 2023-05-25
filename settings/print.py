@@ -2,17 +2,19 @@ import datetime, json, logging, numpy, os, sys, time
 from collections import defaultdict
 from settings.files import make_sure_parent_dir_exists
 
-
 logger = logging.getLogger(__name__)
 
-
 '''[20220330] 11111 -> 3:05:11.00'''
+
+
 def print_seconds(seconds):
     msec = int(abs(seconds - int(seconds)) * 100)
     return f"{datetime.timedelta(seconds=int(seconds))}.{msec:02d}"
 
 
 '''[20220330]'''
+
+
 def print_mean_std(values, latex=False, std=True):
     if std:
         if latex:
@@ -24,11 +26,15 @@ def print_mean_std(values, latex=False, std=True):
 
 
 '''[20220330]'''
+
+
 def print_delta(values, baselines):
     return f"{numpy.mean(values) - numpy.mean(baselines):.1f}"
 
 
 '''[20220330]'''
+
+
 def analyse_dev_and_test_results(train_metric_files, test_metric_files, main_metric_name, hp_names):
     all_dev_results, all_test_results = defaultdict(list), defaultdict(list)
     if test_metric_files is not None:
@@ -79,17 +85,19 @@ def print_large_integer(number, suffix=None):
         if number < 1e9: return f"{str_number[:-6]},{str_number[-6:-3]},{str_number[-3:]}"
         raise ValueError(f"Maybe not a good idea to display such a large number ({number}) in this way")
     else:
-        if suffix == "B": return f"{float(number)/1e9:.1f}B"
-        if suffix == "M": return f"{float(number)/1e6:.1f}M"
-        if suffix == "K": return f"{float(number)/1e3:.1f}K"
+        if suffix == "B": return f"{float(number) / 1e9:.1f}B"
+        if suffix == "M": return f"{float(number) / 1e6:.1f}M"
+        if suffix == "K": return f"{float(number) / 1e3:.1f}K"
 
         if number < 1e3: return f"{number}"
-        if number < 1e6: return f"{float(number)/1e3:.1f}K"
-        if number < 1e9: return f"{float(number)/1e6:.1f}M"
-        return f"{float(number)/1e9:.1f}B"
+        if number < 1e6: return f"{float(number) / 1e3:.1f}K"
+        if number < 1e9: return f"{float(number) / 1e6:.1f}M"
+        return f"{float(number) / 1e9:.1f}B"
 
 
 '''[2022-Feb-17]'''
+
+
 def print_memory_size(size):
     size = size >> 10
     if size < 1024: return f"{size:.1f}K"
@@ -130,8 +138,8 @@ def log_remaining_time(current_step, total_step, start_time, prefix="", suffix="
                 f"Elapsed: {print_seconds(elapsed)}; Estimated remaining: {print_seconds(remaining)}{suffix}")
 
 
-'''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_utils.py#L257'''
 def speed_metrics(split, start_time, num_samples=None, num_steps=None):
+    """[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_utils.py#L257"""
     runtime = time.time() - start_time
     result = {f"{split}_runtime": round(runtime, 4)}
     if num_samples is not None:

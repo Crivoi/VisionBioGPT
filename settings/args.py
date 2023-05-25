@@ -4,6 +4,8 @@ from argparse import ArgumentParser
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from functools import cached_property
+
+import settings
 from pipeline.optimizer import OptimizerNames
 from pipeline.scheduler import SchedulerType
 from pipeline.callback import IntervalStrategy
@@ -76,8 +78,8 @@ class ArgumentsBase:
     task_name: str = field(default=None)
     dataset_name: str = field(default=None)
     output_metrics_filepath: str = field(default=None)
-    output_metrics_train_filepath: str = field(default='./output/train.json')
-    output_metrics_test_filepath: str = field(default='./output/test.json')
+    output_metrics_train_filepath: str = field(default=None)
+    output_metrics_test_filepath: str = field(default=None)
 
     model_dir: str = field(default=None)
     config_dir: str = field(default=None)
@@ -104,12 +106,13 @@ class ArgumentsBase:
 
 @dataclass
 class TrainingArguments:
-    train_filepath: str = field(default=None)
-    dev_filepath: str = field(default=None)
-    test_filepath: str = field(default=None)
-    cache_dir: str = field(default=None)
-    label_filepath: str = field(default=None)
-    output_dir: str = field(default=None)
+    # train_filepath: str = field(default=None)
+    # dev_filepath: str = field(default=None)
+    # test_filepath: str = field(default=None)
+    # label_filepath: str = field(default=None)
+    cache_dir: str = field(default=settings.CACHE_DIR)
+    data_dir: str = field(default=settings.DATA_DIR)
+    output_dir: str = field(default=settings.OUTPUT_DIR)
 
     per_device_train_batch_size: int = field(default=16)
     per_device_eval_batch_size: int = field(default=16)
@@ -153,15 +156,12 @@ class TrainingArguments:
 
 @dataclass
 class TestArguments:
-    output_predictions_filepath: str = field(default=None)
-
-
-'''[TODO]'''
+    output_predictions_filepath: str = field(default=os.path.join(settings.OUTPUT_DIR, "preds.json"))
 
 
 @dataclass
 class TextArguments:
-    max_seq_length: int = field(default=512)
+    max_seq_length: int = field(default=settings.MAX_SEQ_LENGTH)
     do_lower_case: bool = field(default=False)
 
 
@@ -186,19 +186,19 @@ class Arguments(ArgumentsBase, TrainingArguments, TestArguments, TextArguments):
         self.evaluation_strategy = IntervalStrategy(self.evaluation_strategy)
         if self.evaluation_strategy == IntervalStrategy.STEPS:
             assert self.eval_steps > 0
-        if self.dev_filepath is not None:
-            assert self.evaluation_strategy != IntervalStrategy.NO
+        # if self.dev_filepath is not None:
+        #     assert self.evaluation_strategy != IntervalStrategy.NO
 
         self.save_strategy = IntervalStrategy(self.save_strategy)
         self.lr_scheduler_type = SchedulerType(self.lr_scheduler_type)
 
-        if self.load_best_model_at_end and self.train_filepath is not None:
-            assert self.evaluation_strategy == self.save_strategy
-            if self.evaluation_strategy == IntervalStrategy.STEPS:
-                assert self.save_steps % self.eval_steps == 0
-            assert self.metric_for_best_model is not None
-        if self.metric_for_best_model is not None:
-            assert self.greater_is_better is not None
+        # if self.load_best_model_at_end and self.train_filepath is not None:
+        #     assert self.evaluation_strategy == self.save_strategy
+        #     if self.evaluation_strategy == IntervalStrategy.STEPS:
+        #         assert self.save_steps % self.eval_steps == 0
+        #     assert self.metric_for_best_model is not None
+        # if self.metric_for_best_model is not None:
+        #     assert self.greater_is_better is not None
 
         self.optim = OptimizerNames(self.optim)
 

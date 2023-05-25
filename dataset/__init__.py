@@ -11,6 +11,7 @@ import logging
 from transformers import BioGptTokenizer
 
 import settings
+from settings.args import Arguments
 from settings.utils import Splits
 
 logger = logging.getLogger(__name__)
@@ -18,15 +19,20 @@ logger = logging.getLogger(__name__)
 
 class MimicDataset(Dataset):
     task_name: str = 'multilabel'
-    data_path: str = os.path.join(settings.DATA_DIR)
     do_lower_case: bool = False
-    max_seq_length: int = settings.MAX_SEQ_LENGTH
+    max_seq_length: int
+    data_dir: str
+    cache_dir: str
 
-    def __init__(self, tokenizer=None, split=None, label2idx=None, cache_dir=None):
+    def __init__(self, args: Arguments, tokenizer=None, split=None, label2idx=None):
         assert (label2idx is not None) or (split == "train")
 
-        self.cache_dir = cache_dir
-        filepath = f"{self.data_path}/{split}.json"
+        self.data_dir = args.data_dir
+        self.cache_dir = args.cache_dir
+        self.do_lower_case = args.do_lower_case
+        self.max_seq_length = args.max_seq_length
+
+        filepath = f"{self.data_dir}/{split}.json"
 
         if self.cache_dir is not None:
             os.makedirs(self.cache_dir, exist_ok=True)

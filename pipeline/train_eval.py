@@ -16,7 +16,7 @@ from pipeline.callback import EarlyStoppingCallback
 from settings.args import HfArgumentParser, ArgumentsForHiTransformer as Arguments
 from settings.files import write_object_to_json_file
 from settings.utils import set_seed, Splits
-from settings.print import set_logging_format, print_seconds
+from settings.print import set_logging_format, print_seconds, log_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +26,14 @@ def parse_args() -> Arguments:
     args: Arguments = parser.parse_args_into_dataclasses()[0]
     device = args._setup_devices
     set_logging_format(
-        os.path.join(args.output_dir, "logs", f"train_eval_{datetime.now().strftime('%m_%d_%H_%M')}.log"))
+        os.path.join(args.output_dir, "logs", f"train_eval_{datetime.now().strftime('%H%M')}.log"))
     set_seed(args.seed)
     if args.should_log:
         logger.info("**************************************************")
         logger.info("*             Parse the arguments                *")
         logger.info("**************************************************")
         logger.info(f"Device: {device}")
-        logger.info(args)
+        logger.info(args.__dict__)
     return args
 
 
@@ -44,26 +44,26 @@ def load_data(args: Arguments) -> Tuple:
         logger.info("**************************************************")
 
     tokenizer = BioGptTokenizer.from_pretrained(settings.BIOGPT_CHECKPOINT, use_fast=True)
-    data_collator = Collator(tokenizer=tokenizer, max_seq_length=settings.MAX_SEQ_LENGTH)
+    data_collator = Collator(tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 
     train_dataset: MimicDataset = MimicDataset(
+        args=args,
         tokenizer=tokenizer,
         split=Splits.train.value,
-        cache_dir=args.cache_dir or settings.CACHE_DIR
     )
 
     dev_dataset: MimicDataset = MimicDataset(
+        args=args,
         tokenizer=tokenizer,
         split=Splits.dev.value,
         label2idx=train_dataset.label2idx,
-        cache_dir=args.cache_dir or settings.CACHE_DIR
     )
 
     test_dataset: MimicDataset = MimicDataset(
+        args=args,
         tokenizer=tokenizer,
         split=Splits.test.value,
         label2idx=train_dataset.label2idx,
-        cache_dir=args.cache_dir or settings.CACHE_DIR,
     )
 
     idx2label: Dict = dict((v, k) for k, v in train_dataset.label2idx.items())
@@ -114,14 +114,18 @@ def train(tokenizer, train_dataset, dev_dataset, args, idx2label, data_collator)
 
     args.complete_running_time = print_seconds(time.time() - args.init_args_time)
 
+    log_metrics(split=Splits.train.value, metrics=train_metrics)
+    log_metrics(split=Splits.dev.value, metrics=dev_metrics)
+
     write_object_to_json_file(
         data=dict(
             args=dataclasses.asdict(args),
             training_state=dataclasses.asdict(trainer.state),
             train_metrics=train_metrics,
-            dev_metrics=dev_metrics
+            dev_metrics=dev_metrics,
+            model_state_dict=model.state_dict()
         ),
-        filepath=args.output_metrics_train_filepath,
+        filepath=os.path.join(args.output_dir, "train_metrics.json"),
         sort_keys=True
     )
 
@@ -140,7 +144,10 @@ def evaluate(model, args, idx2label, data_collator) -> BioGptModel:
         idx2label=idx2label,
         data_collator=data_collator
     )
+
     test_outputs = evaluator.predict(test_dataset, metric_key_prefix="test")
+
+    log_metrics(split=Splits.dev.value, metrics=test_outputs["metrics"])
 
     if args.output_predictions_filepath is not None:
         preds = Metric.get_labels_from_logitis(test_outputs["logits"], idx2label, args.task_name)
@@ -153,7 +160,7 @@ def evaluate(model, args, idx2label, data_collator) -> BioGptModel:
             test_metrics=test_outputs["metrics"],
             model_state_dict=model.state_dict()
         ),
-        filepath=args.output_metrics_train_filepath,
+        filepath=os.path.join(args.output_dir, "test_metrics.json"),
         sort_keys=True
     )
 
@@ -168,6 +175,7 @@ if __name__ == '__main__':
         idx2label=idx2label,
         data_collator=data_collator
     )
+
     model = train(
         tokenizer=tokenizer,
         train_dataset=train_dataset,
@@ -180,14 +188,16 @@ if __name__ == '__main__':
         **kwargs
     )
 
-    save_dir = os.path.join(args.output_dir, f"runs_{datetime.now().strftime('%m_%d')}")
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir, exist_ok=True)
+    runs_dir = os.path.join(args.output_dir, "runs")
+    if not os.path.exists(runs_dir):
+        os.makedirs(runs_dir)
 
     torch.save(
         model.state_dict(),
-        os.path.join(save_dir,
-                     f"pytorch_model_length_{settings.MAX_SEQ_LENGTH}_{datetime.now().strftime('%H_%M_%S')}.bin")
+        os.path.join(
+            runs_dir,
+            f"model_seq_{args.max_seq_length}_labels_{settings.NUM_LABELS}_{datetime.now().strftime('%H%M')}.bin"
+        )
     )
 
     if args.should_log:
