@@ -4,13 +4,12 @@ import os
 
 import torch
 from filelock import FileLock
-from torch.utils.data import Dataset, DataLoader, RandomSampler
+from torch.utils.data import Dataset
 
 import logging
 
 from transformers import BioGptTokenizer
 
-import settings
 from settings.args import Arguments
 from settings.utils import Splits
 
@@ -127,22 +126,22 @@ class Collator:
         return batch
 
 
-def build_sampler(dataset):
-    assert isinstance(dataset, collections.abc.Sized)
-    generator = torch.Generator()
-    generator.manual_seed(int(torch.empty((), dtype=torch.int64).random_().item()))
-    return RandomSampler(dataset, generator=generator)
-
-
-def build_dataloader(dataset, collate_fn):
-    train_sampler = build_sampler(dataset)
-    return DataLoader(
-        dataset,
-        batch_size=settings.BATCH_SIZE,
-        sampler=train_sampler,
-        collate_fn=collate_fn,
-        pin_memory=True
-    )
+# def build_sampler(dataset):
+#     assert isinstance(dataset, collections.abc.Sized)
+#     generator = torch.Generator()
+#     generator.manual_seed(int(torch.empty((), dtype=torch.int64).random_().item()))
+#     return RandomSampler(dataset, generator=generator)
+#
+#
+# def build_dataloader(dataset, collate_fn):
+#     train_sampler = build_sampler(dataset)
+#     return DataLoader(
+#         dataset,
+#         batch_size=settings.BATCH_SIZE,
+#         sampler=train_sampler,
+#         collate_fn=collate_fn,
+#         pin_memory=True
+#     )
 
 
 if __name__ == '__main__':
