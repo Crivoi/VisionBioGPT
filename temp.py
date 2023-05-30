@@ -28,6 +28,7 @@ if __name__ == '__main__':
 
     model = evaluate(
         model=model,
+        test_dataset=test_dataset,
         **kwargs
     )
 

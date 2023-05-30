@@ -21,8 +21,8 @@ python3 temp.py \
   --save_strategy=epoch \
   --max_seq_length=$max_seq_length \
   --num_train_epochs=$epochs \
-  --per_device_train_batch_size=8 \
-  --per_device_eval_batch_size=2 \
+  --per_device_train_batch_size=1 \
+  --per_device_eval_batch_size=1 \
   --metric_for_best_model=micro_f1 \
   --should_log=True \
   --segment_length=64 --do_use_stride --do_use_label_wise_attention

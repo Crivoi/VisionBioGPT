@@ -22,7 +22,7 @@ logger.info(f"Device: {DEVICE}")
 
 ROOT_DIR = config.ROOT_DIR
 BIOGPT_CHECKPOINT = "microsoft/biogpt"
-MAX_SEQ_LENGTH = 1024
+MAX_SEQ_LENGTH = 5
 NUM_LABELS = 50
 BATCH_SIZE = 8
 

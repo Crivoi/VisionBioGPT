@@ -1,4 +1,5 @@
 import dataclasses
+import json
 import logging
 import os
 import time
@@ -33,6 +34,7 @@ def parse_args() -> Arguments:
         logger.info("*             Parse the arguments                *")
         logger.info("**************************************************")
         logger.info(f"Device: {device}")
+        logger.info(f"Sequence Length: {args.max_seq_length}")
         logger.info(args.__dict__)
     return args
 
@@ -132,7 +134,7 @@ def train(tokenizer, train_dataset, dev_dataset, args, idx2label, data_collator)
     return model
 
 
-def evaluate(model, args, idx2label, data_collator) -> BioGptModel:
+def evaluate(model, test_dataset, args, idx2label, data_collator) -> BioGptModel:
     if args.should_log:
         logger.info("**************************************************")
         logger.info("*               Starting evaluation              *")
@@ -167,7 +169,7 @@ def evaluate(model, args, idx2label, data_collator) -> BioGptModel:
     return model
 
 
-if __name__ == '__main__':
+def main():
     args: Arguments = parse_args()
     tokenizer, train_dataset, dev_dataset, test_dataset, idx2label, data_collator = load_data(args)
     kwargs = dict(
@@ -185,6 +187,7 @@ if __name__ == '__main__':
 
     model = evaluate(
         model=model,
+        test_dataset=test_dataset,
         **kwargs
     )
 
@@ -204,3 +207,7 @@ if __name__ == '__main__':
         logger.info("**************************************************")
         logger.info("*               Finished execution               *")
         logger.info("**************************************************")
+
+
+if __name__ == '__main__':
+    main()
