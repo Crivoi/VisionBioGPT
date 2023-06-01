@@ -166,7 +166,6 @@ class Trainer:
                     (step + 1 == len(epoch_iterator)) and len(epoch_iterator) <= self.args.gradient_accumulation_steps):
                 if self.args.max_grad_norm > 0:
                     self.scaler.unscale_(self.optimizer)
-                    # TODO: there is a warning message
                     torch.nn.utils.clip_grad_norm_(model.parameters(), self.args.max_grad_norm)
 
                 scale_before = self.scaler.get_scale()

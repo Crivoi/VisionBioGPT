@@ -110,7 +110,7 @@ class TrainingArguments:
     # dev_filepath: str = field(default=None)
     # test_filepath: str = field(default=None)
     # label_filepath: str = field(default=None)
-    cache_dir: str = field(default=settings.CACHE_DIR)
+    cache_dir: str = field(default=None)
     data_dir: str = field(default=settings.DATA_DIR)
     output_dir: str = field(default=settings.OUTPUT_DIR)
 

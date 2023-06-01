@@ -126,22 +126,44 @@ class Collator:
         return batch
 
 
-# def build_sampler(dataset):
-#     assert isinstance(dataset, collections.abc.Sized)
-#     generator = torch.Generator()
-#     generator.manual_seed(int(torch.empty((), dtype=torch.int64).random_().item()))
-#     return RandomSampler(dataset, generator=generator)
-#
-#
-# def build_dataloader(dataset, collate_fn):
-#     train_sampler = build_sampler(dataset)
-#     return DataLoader(
-#         dataset,
-#         batch_size=settings.BATCH_SIZE,
-#         sampler=train_sampler,
-#         collate_fn=collate_fn,
-#         pin_memory=True
-#     )
+class MimicDatasetForLM(MimicDataset):
+    def convert_examples_to_features(self, examples, tokenizer, text_field="text"):
+        features = []
+        for example in examples:
+            text = example[text_field]
+            if self.do_lower_case:
+                text = text.lower()
+            outputs = tokenizer(
+                text,
+                padding='max_length',
+                truncation=True,
+                max_length=self.max_seq_length
+            )
+            feature = dict(
+                **outputs,
+                labels=outputs['input_ids']
+            )
+            features.append(feature)
+
+        if len(examples) > 0:
+            logger.info(examples[0])
+            logger.info(features[0])
+
+        return features
+
+
+class CollatorForLM(Collator):
+    def __call__(self, features):
+        max_seq_length = max([len(f["input_ids"]) for f in features])
+        max_seq_length = min(max_seq_length, self.max_seq_length)
+        batch = self.tokenizer.pad(features, padding=True, max_length=max_seq_length)
+        batch = {k: torch.tensor(v, dtype=torch.int64) for k, v in batch.items()}
+        # assert self.task_name in ["singlelabel", "multilabel"]
+        # if self.task_name == "singlelabel":
+        #     batch["labels"] = torch.tensor([f["labels"][0] for f in features], dtype=torch.int64)
+        # else:
+        #     batch["labels"] = torch.tensor([f["labels"] for f in features], dtype=torch.int64)
+        return batch
 
 
 if __name__ == '__main__':

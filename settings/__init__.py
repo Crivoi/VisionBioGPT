@@ -24,9 +24,9 @@ ROOT_DIR = config.ROOT_DIR
 BIOGPT_CHECKPOINT = "microsoft/biogpt"
 MAX_SEQ_LENGTH = 5
 NUM_LABELS = 50
-BATCH_SIZE = 8
+BATCH_SIZE = 2
 
-CACHE_DIR = os.path.join(ROOT_DIR, f'cache_{NUM_LABELS}_labels_{MAX_SEQ_LENGTH}_seq_len')
+# CACHE_DIR = os.path.join(ROOT_DIR, f'cache_{NUM_LABELS}_labels_{MAX_SEQ_LENGTH}_seq_len')
 DATA_DIR = os.path.join(ROOT_DIR, 'data', DataSamples.sample.value)
 OUTPUT_DIR = os.path.join(ROOT_DIR, 'model_output', datetime.now().strftime('%m_%d'))
 
