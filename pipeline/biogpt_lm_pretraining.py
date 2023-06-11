@@ -1,5 +1,4 @@
 import dataclasses
-import json
 import logging
 import os
 import time
@@ -7,10 +6,11 @@ from typing import Dict, Tuple
 from datetime import datetime
 
 import torch
-from transformers import BioGptTokenizer, BioGptConfig, BioGptForSequenceClassification, BioGptModel, BioGptForCausalLM
+import wandb
+from transformers import BioGptTokenizer, BioGptConfig, BioGptModel, BioGptForCausalLM
 
 import settings
-from dataset import MimicDataset, Collator, MimicDatasetForLM, CollatorForLM
+from dataset import MimicDataset, MimicDatasetForLM, CollatorForLM
 from metrics import Metric
 from pipeline import Trainer
 from pipeline.callback import EarlyStoppingCallback
@@ -81,27 +81,11 @@ def build_trainer(tokenizer, train_dataset, dev_dataset, args, idx2label, data_c
 
     config: BioGptConfig = BioGptConfig.from_pretrained(settings.BIOGPT_CHECKPOINT, num_labels=settings.NUM_LABELS)
     model: BioGptModel = BioGptForCausalLM.from_pretrained(settings.BIOGPT_CHECKPOINT, config=config)
-    compute_metrics: Metric = Metric(idx2label, args.task_name)
+    # compute_metrics: Metric = Metric(idx2label, args.task_name)
     trainer: Trainer = Trainer(model=model, args=args, data_collator=data_collator, train_dataset=train_dataset,
-                               eval_dataset=dev_dataset, tokenizer=tokenizer, compute_metrics=compute_metrics,
-                               callbacks=[EarlyStoppingCallback])
+                               eval_dataset=dev_dataset, tokenizer=tokenizer, callbacks=[EarlyStoppingCallback])
 
     return trainer, model
-
-
-def build_evaluator(model, args, idx2label, data_collator) -> Tuple[Trainer, BioGptModel]:
-    if args.should_log:
-        logger.info("**************************************************")
-        logger.info("*               Build the evaluator              *")
-        logger.info("**************************************************")
-
-    compute_metrics: Metric = Metric(idx2label, args.task_name)
-    evaluator: Trainer = Trainer(model=model,
-                                 args=args,
-                                 data_collator=data_collator,
-                                 compute_metrics=compute_metrics)
-
-    return evaluator, model
 
 
 def train(tokenizer, train_dataset, dev_dataset, args, idx2label, data_collator) -> BioGptModel:
@@ -111,20 +95,29 @@ def train(tokenizer, train_dataset, dev_dataset, args, idx2label, data_collator)
         logger.info("**************************************************")
 
     trainer, model = build_trainer(tokenizer, train_dataset, dev_dataset, args, idx2label, data_collator)
+
+    ppl_before_training = trainer.compute_perplexity(dev_dataset)
+
+    logger.info(f"Perplexity on test set before training: {ppl_before_training['perplexity']}")
+
     train_metrics = trainer.train()
-    dev_metrics = trainer.predict(dev_dataset, metric_key_prefix="dev")["metrics"]
+    # dev_metrics = trainer.predict(dev_dataset, metric_key_prefix="dev")["metrics"]
+
+    ppl_after_training = trainer.compute_perplexity(dev_dataset)
+
+    logger.info(f"Perplexity on test set after training: {ppl_after_training['perplexity']}")
 
     args.complete_running_time = print_seconds(time.time() - args.init_args_time)
 
     log_metrics(split=Splits.train.value, metrics=train_metrics)
-    log_metrics(split=Splits.dev.value, metrics=dev_metrics)
+    # log_metrics(split=Splits.dev.value, metrics=dev_metrics)
 
     write_object_to_json_file(
         data=dict(
             args=dataclasses.asdict(args),
             training_state=dataclasses.asdict(trainer.state),
             train_metrics=train_metrics,
-            dev_metrics=dev_metrics,
+            # dev_metrics=dev_metrics,
             model_state_dict=model.state_dict()
         ),
         filepath=os.path.join(args.output_dir, "train_metrics.json"),
@@ -134,79 +127,42 @@ def train(tokenizer, train_dataset, dev_dataset, args, idx2label, data_collator)
     return model
 
 
-def evaluate(model, test_dataset, args, idx2label, data_collator) -> BioGptModel:
-    if args.should_log:
-        logger.info("**************************************************")
-        logger.info("*               Starting evaluation              *")
-        logger.info("**************************************************")
-
-    evaluator, model = build_evaluator(
-        model=model,
-        args=args,
-        idx2label=idx2label,
-        data_collator=data_collator
-    )
-
-    test_outputs = evaluator.predict(test_dataset, metric_key_prefix="test")
-
-    log_metrics(split=Splits.dev.value, metrics=test_outputs["metrics"])
-
-    if args.output_predictions_filepath is not None:
-        preds = Metric.get_labels_from_logitis(test_outputs["logits"], idx2label, args.task_name)
-        write_object_to_json_file(preds, args.output_predictions_filepath)
-
-    args.complete_running_time = print_seconds(time.time() - args.init_args_time)
-    write_object_to_json_file(
-        dict(
-            args=dataclasses.asdict(args),
-            test_metrics=test_outputs["metrics"],
-            model_state_dict=model.state_dict()
-        ),
-        filepath=os.path.join(args.output_dir, "test_metrics.json"),
-        sort_keys=True
-    )
-
-    return model
-
-
 def main():
+    wandb.login()
+
     args: Arguments = parse_args()
-    tokenizer, train_dataset, dev_dataset, test_dataset, idx2label, data_collator = load_data(args)
-    kwargs = dict(
-        args=args,
-        idx2label=idx2label,
-        data_collator=data_collator
-    )
 
-    model = train(
-        tokenizer=tokenizer,
-        train_dataset=train_dataset,
-        dev_dataset=dev_dataset,
-        **kwargs
-    )
-
-    model = evaluate(
-        model=model,
-        test_dataset=test_dataset,
-        **kwargs
-    )
-
-    runs_dir = os.path.join(args.output_dir, "runs")
-    if not os.path.exists(runs_dir):
-        os.makedirs(runs_dir)
-
-    torch.save(
-        model.state_dict(),
-        os.path.join(
-            runs_dir,
-            f"model_seq_{args.max_seq_length}_labels_{settings.NUM_LABELS}_{datetime.now().strftime('%H%M')}.bin"
+    with wandb.init(entity='andrei-crivoi1997', project="biogpt-lm-pretraining", config=args.__dict__):
+        tokenizer, train_dataset, dev_dataset, test_dataset, idx2label, data_collator = load_data(args)
+        kwargs = dict(
+            args=args,
+            idx2label=idx2label,
+            data_collator=data_collator
         )
-    )
 
-    if args.should_log:
-        logger.info("**************************************************")
-        logger.info("*               Finished execution               *")
-        logger.info("**************************************************")
+        model = train(
+            tokenizer=tokenizer,
+            train_dataset=train_dataset,
+            dev_dataset=dev_dataset,
+            **kwargs
+        )
+
+        runs_dir = os.path.join(args.output_dir, "runs")
+        if not os.path.exists(runs_dir):
+            os.makedirs(runs_dir)
+
+        model_save_dir = os.path.join(
+            runs_dir,
+            f"causal_lm_tapt_{args.max_seq_length}.bin"
+        )
+
+        torch.save(model.state_dict(), model_save_dir)
+
+        if args.should_log:
+            logger.info(f"Saved trained model at {model_save_dir}")
+            logger.info("**************************************************")
+            logger.info("*               Finished execution               *")
+            logger.info("**************************************************")
 
 
 if __name__ == '__main__':

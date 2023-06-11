@@ -1,5 +1,9 @@
 import collections, logging, math, numpy, os, torch
 from collections.abc import Mapping
+
+import wandb
+
+import settings
 from settings.files import remove_checkpoints
 from settings.tensors import nested_detach
 
@@ -194,6 +198,42 @@ def prediction_step(model, inputs, device):
     return {"loss": loss, "logits": logits, "golds": golds}
 
 
+def perplexity_step(model, inputs, args):
+    inputs = prepare_input(inputs, args.device)
+    max_length = args.max_seq_length
+    stride = args.max_seq_length // 4
+    seq_len = args.max_seq_length
+
+    nlls = []
+    prev_end_loc = 0
+    for begin_loc in range(0, seq_len, stride):
+        end_loc = min(begin_loc + max_length, seq_len)
+        trg_len = end_loc - prev_end_loc  # may be different from stride on last loop
+        input_ids = inputs['input_ids'][:, begin_loc:end_loc].to(args.device)
+        target_ids = inputs['input_ids'].clone()
+        target_ids[:, :-trg_len] = -100
+
+        with torch.no_grad():
+            with torch.cuda.amp.autocast():
+                outputs = model(input_ids, labels=target_ids)
+
+                # loss is calculated using CrossEntropyLoss which averages over valid labels
+                # N.B. the model only calculates loss over trg_len - 1 labels, because it internally shifts the labels
+                # to the left by 1.
+                neg_log_likelihood = outputs.loss
+
+        nlls.append(neg_log_likelihood)
+
+        prev_end_loc = end_loc
+        if end_loc == seq_len:
+            break
+
+    average_loss = torch.stack(nlls).mean()
+    ppl = torch.exp(average_loss)
+
+    return dict(loss=average_loss, perplexity=ppl)
+
+
 '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L1913
                  do_grad_scaling is True, using fp16 and amp'''
 
@@ -210,4 +250,5 @@ def training_step(model, inputs, scaler, args):
     if args.gradient_accumulation_steps > 1:
         loss = loss / args.gradient_accumulation_steps
     scaler.scale(loss).backward()
+
     return loss.detach()

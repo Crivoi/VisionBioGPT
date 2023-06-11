@@ -26,8 +26,9 @@ MAX_SEQ_LENGTH = 5
 NUM_LABELS = 50
 BATCH_SIZE = 2
 
-# CACHE_DIR = os.path.join(ROOT_DIR, f'cache_{NUM_LABELS}_labels_{MAX_SEQ_LENGTH}_seq_len')
-DATA_DIR = os.path.join(ROOT_DIR, 'data', DataSamples.sample.value)
+DATA_SPLIT = DataSamples.sample.value
+CACHE_DIR = os.path.join(ROOT_DIR, f'cache_{DATA_SPLIT}_{MAX_SEQ_LENGTH}_seq_len')
+DATA_DIR = os.path.join(ROOT_DIR, 'data', DATA_SPLIT)
 OUTPUT_DIR = os.path.join(ROOT_DIR, 'model_output', datetime.now().strftime('%m_%d'))
 
 if __name__ == '__main__':

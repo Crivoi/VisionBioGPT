@@ -4,11 +4,11 @@ from typing import List
 from settings.print import log_remaining_time
 from transformers.file_utils import ExplicitEnum
 
-
 logger = logging.getLogger(__name__)
 
-
 '''[TODO] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_utils.py#L115'''
+
+
 class IntervalStrategy(ExplicitEnum):
     NO = "no"
     STEPS = "steps"
@@ -16,6 +16,8 @@ class IntervalStrategy(ExplicitEnum):
 
 
 '''[2022-Mar-11] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_callback.py#L36'''
+
+
 @dataclass
 class TrainerState:
     epoch: float = None
@@ -44,6 +46,8 @@ class TrainerState:
 
 
 '''[2022-Mar-11] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_callback.py#L111'''
+
+
 @dataclass
 class TrainerControl:
     should_training_stop = False
@@ -65,6 +69,8 @@ class TrainerControl:
 
 
 '''[2022-Mar-11] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_callback.py#L160'''
+
+
 class TrainerCallback:
     def on_init_end(self, args, state, control, **kwargs):
         pass
@@ -104,6 +110,8 @@ class TrainerCallback:
 
 
 '''[2022-Mar-11] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_callback.py#L285'''
+
+
 class CallbackHandler(TrainerCallback):
     def __init__(self, callbacks, model, tokenizer, optimizer, lr_scheduler):
         self.callbacks = []
@@ -177,6 +185,8 @@ class CallbackHandler(TrainerCallback):
 
 
 '''[2022-Mar-11] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_callback.py#L407'''
+
+
 class DefaultFlowCallback(TrainerCallback):
     def on_step_end(self, args, state, control, **kwargs):
         if state.global_step == 1:
@@ -212,6 +222,8 @@ class DefaultFlowCallback(TrainerCallback):
 
 
 '''[TODO] https://github.com/huggingface/transformers/blob/v4.17.0/src/transformers/trainer_callback.py#L505'''
+
+
 class EarlyStoppingCallback(TrainerCallback):
     def __init__(self, early_stopping_patience=5):
         self.early_stopping_patience = early_stopping_patience
@@ -234,7 +246,7 @@ class EarlyStoppingCallback(TrainerCallback):
 
     def on_train_begin(self, args, state, control, **kwargs):
         assert args.load_best_model_at_end and args.metric_for_best_model
-        assert args.evaluation_strategy != IntervalStrategy.NO
+        # assert args.evaluation_strategy != IntervalStrategy.NO
 
     def on_evaluate(self, args, state, control, metrics, **kwargs):
         metric_to_check = args.metric_for_best_model

@@ -94,8 +94,7 @@ class MimicDataset(Dataset):
             features.append(feature)
 
         if len(examples) > 0:
-            logger.info(examples[0])
-            logger.info(features[0])
+            logger.info(features[0].get('input_ids').size)
 
         return features
 

@@ -4,13 +4,14 @@ import math
 import os
 import time
 import torch
+import wandb
 from torch.utils.data import DataLoader
 
 from pipeline.callback import DefaultFlowCallback, CallbackHandler, TrainerControl
 from pipeline.callback import TrainerState
 from pipeline.optimizer import create_optimizer
 from pipeline.scheduler import create_scheduler
-from pipeline.utils import get_eval_dataloader, get_train_dataloader, training_step, prediction_step
+from pipeline.utils import get_eval_dataloader, get_train_dataloader, training_step, prediction_step, perplexity_step
 from pipeline.utils import load_state_dict_in_model, save_checkpoint, wrap_model
 from settings.utils import set_seed
 from settings.print import print_large_integer, speed_metrics, log_remaining_time
@@ -62,6 +63,7 @@ class Trainer:
 
     def train(self):
         model, start_time, num_train_epochs, num_train_samples, train_dataloader = self.before_training()
+        wandb.watch(model, self.optimizer, log='all', log_freq=10)
 
         for epoch in range(num_train_epochs):
             if epoch > 0:
@@ -161,6 +163,11 @@ class Trainer:
             self.current_flos += float(
                 self.model.floating_point_ops(inputs) if hasattr(self.model,
                                                                  "floating_point_ops") and "input_ids" in inputs else 0)
+
+            wandb.log(dict(epoch=epoch, loss=tr_loss_step), step=step)
+
+            if (step + 1) % 10 == 0:
+                self.compute_perplexity(self.eval_dataset)
 
             if (step + 1) % self.args.gradient_accumulation_steps == 0 or (
                     (step + 1 == len(epoch_iterator)) and len(epoch_iterator) <= self.args.gradient_accumulation_steps):
@@ -286,6 +293,28 @@ class Trainer:
         outputs["metrics"].update(speed_metrics(metric_key_prefix, start_time, num_samples=len(test_dataset),
                                                 num_steps=math.ceil(len(test_dataset) / total_batch_size)))
         self._memory_tracker.stop_and_update_metrics(outputs["metrics"])
+        return outputs
+
+    def perplexity_loop(self, dataloader):
+        model = wrap_model(self.model, self.args, training=False)
+
+        model.eval()
+
+        for step, inputs in enumerate(dataloader):
+            outputs = perplexity_step(model, inputs, self.args)
+
+            if self.args.should_log:
+                wandb.log(dict(perplexity=outputs['perplexity']))
+
+        model.train()
+
+        return outputs
+
+    def compute_perplexity(self, test_dataset):
+        test_dataloader = get_eval_dataloader(test_dataset, self.data_collator, self.args)
+        outputs = self.perplexity_loop(test_dataloader)
+        # if self.args.should_log:
+        #     logger.info(f"Perplexity on test set: {outputs['perplexity']}")
         return outputs
 
     '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L1852'''
