@@ -40,7 +40,9 @@ class MimicDataset(Dataset):
                     self.examples = torch.load(os.path.join(self.cache_dir, f"{split}.examples"))
                     self.label2idx = torch.load(os.path.join(self.cache_dir, f"{split}.label2idx"))
                     self.features = torch.load(os.path.join(self.cache_dir, f"{split}.features"))
-                    logger.info(f"Loading {len(self.features)} examples from cached directory {self.cache_dir}")
+                    logger.info(
+                        f"Loading {len(self.features)} examples from cached directory {self.cache_dir}, split {split}"
+                    )
                 else:
                     self.load_from_filepath(filepath, tokenizer, label2idx)
                     torch.save(self.examples, os.path.join(self.cache_dir, f"{split}.examples"))
@@ -93,8 +95,8 @@ class MimicDataset(Dataset):
             )
             features.append(feature)
 
-        if len(examples) > 0:
-            logger.info(features[0].get('input_ids').size)
+        # if len(examples) > 0:
+        #     logger.info(features[0].get('input_ids').size)
 
         return features
 
@@ -163,6 +165,97 @@ class CollatorForLM(Collator):
         # else:
         #     batch["labels"] = torch.tensor([f["labels"] for f in features], dtype=torch.int64)
         return batch
+
+
+class MimicCXRDataset(Dataset):
+    task_name: str = 'multilabel'
+    do_lower_case: bool = False
+    max_seq_length: int
+    data_dir: str
+    cache_dir: str
+
+    def __init__(self, args: Arguments, tokenizer=None, split=None, label2idx=None):
+        assert (label2idx is not None) or (split == "train")
+
+        self.data_dir = args.data_dir
+        self.cache_dir = args.cache_dir
+        self.do_lower_case = args.do_lower_case
+        self.max_seq_length = args.max_seq_length
+
+        filepath = f"{self.data_dir}/{split}.json"
+
+        if self.cache_dir is not None:
+            os.makedirs(self.cache_dir, exist_ok=True)
+            with FileLock(os.path.join(self.cache_dir, f"{split}.lock")):
+                if os.path.exists(os.path.join(self.cache_dir, f"{split}.features")):
+                    self.examples = torch.load(os.path.join(self.cache_dir, f"{split}.examples"))
+                    self.label2idx = torch.load(os.path.join(self.cache_dir, f"{split}.label2idx"))
+                    self.features = torch.load(os.path.join(self.cache_dir, f"{split}.features"))
+                    logger.info(
+                        f"Loading {len(self.features)} examples from cached directory {self.cache_dir}, split {split}"
+                    )
+                else:
+                    self.load_from_filepath(filepath, tokenizer, label2idx)
+                    torch.save(self.examples, os.path.join(self.cache_dir, f"{split}.examples"))
+                    torch.save(self.label2idx, os.path.join(self.cache_dir, f"{split}.label2idx"))
+                    torch.save(self.features, os.path.join(self.cache_dir, f"{split}.features"))
+        else:
+            self.load_from_filepath(filepath, tokenizer, label2idx)
+
+    def load_from_filepath(self, filepath, tokenizer, label2idx):
+        self.examples = [json.loads(l.strip()) for l in open(filepath).readlines()]
+        self.label2idx = label2idx if label2idx is not None else self.build_label2idx_from_examples()
+        self.features = self.convert_examples_to_features(self.examples, tokenizer)
+        logger.info(f"Loading {len(self.features)} examples from file {filepath}")
+
+    def build_label2idx_from_examples(self):
+        labels = set()
+        for e in self.examples:
+            if self.task_name == "multilabel":
+                labels = labels.union(set(e["labels"]))
+            elif self.task_name == "singlelabel":
+                labels.add(e["label"])
+        return {l: i for i, l in enumerate(sorted(labels))}
+
+    def get_example_label(self, example):
+        if self.task_name == "singlelabel":
+            return [self.label2idx[example["label"]]]
+        elif self.task_name == "multilabel":
+            label_ids = [0] * len(self.label2idx)
+            for l in example["labels"]:
+                label_ids[self.label2idx[l]] = 1
+            return label_ids
+        raise ValueError(f"Unknown task: {self.task_name}")
+
+    def convert_examples_to_features(self, examples, tokenizer, text_field="text"):
+        features = []
+        for example in examples:
+            text = example[text_field]
+            if self.do_lower_case:
+                text = text.lower()
+            outputs = tokenizer(
+                text,
+                padding='max_length',
+                truncation=True,
+                max_length=self.max_seq_length
+            )
+            feature = dict(
+                input_ids=outputs["input_ids"],
+                labels=self.get_example_label(example),
+                attention_mask=outputs["attention_mask"]
+            )
+            features.append(feature)
+
+        # if len(examples) > 0:
+        #     logger.info(features[0].get('input_ids').size)
+
+        return features
+
+    def __len__(self):
+        return len(self.features)
+
+    def __getitem__(self, i):
+        return self.features[i]
 
 
 if __name__ == '__main__':

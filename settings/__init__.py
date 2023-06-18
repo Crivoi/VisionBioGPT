@@ -22,9 +22,8 @@ logger.info(f"Device: {DEVICE}")
 
 ROOT_DIR = config.ROOT_DIR
 BIOGPT_CHECKPOINT = "microsoft/biogpt"
-MAX_SEQ_LENGTH = 5
+MAX_SEQ_LENGTH = 1024
 NUM_LABELS = 50
-BATCH_SIZE = 2
 
 DATA_SPLIT = DataSamples.sample.value
 CACHE_DIR = os.path.join(ROOT_DIR, f'cache_{DATA_SPLIT}_{MAX_SEQ_LENGTH}_seq_len')

@@ -19,6 +19,23 @@ class DataSamples(Enum):
     full = 'full'
 
 
+class MimicCXRLabels(Enum):
+    atelectasis = 'Atelectasis'
+    cardiomegaly = 'Cardiomegaly'
+    consolidation = 'Consolidation'
+    edema = 'Edema'
+    enlarged_cardiomediastinum = 'Enlarged Cardiomediastinum'
+    fracture = 'Fracture'
+    lung_lesion = 'Lung Lesion'
+    lung_opacity = 'Lung Opacity'
+    no_finding = 'No Finding'
+    pleural_effusion = 'Pleural Effusion'
+    pleural_other = 'Pleural Other'
+    pneumonia = 'Pneumonia'
+    pneumothorax = 'Pneumothorax'
+    support_devices = 'Support Devices'
+
+
 def pad_sequences(sequences, max_length=None, dtype="int32", value=0):
     """[2022-Feb-17] https://github.com/LorrinWWW/Pyramid/blob/master/utils/data.py#L327"""
     batch_size = len(sequences)

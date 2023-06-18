@@ -3,15 +3,18 @@ import logging
 import math
 import os
 import time
+from functools import cached_property
+
 import torch
 import wandb
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from pipeline.callback import DefaultFlowCallback, CallbackHandler, TrainerControl
 from pipeline.callback import TrainerState
 from pipeline.optimizer import create_optimizer
 from pipeline.scheduler import create_scheduler
-from pipeline.utils import get_eval_dataloader, get_train_dataloader, training_step, prediction_step, perplexity_step
+from pipeline.utils import get_eval_dataloader, get_train_dataloader, training_step, prediction_step
 from pipeline.utils import load_state_dict_in_model, save_checkpoint, wrap_model
 from settings.utils import set_seed
 from settings.print import print_large_integer, speed_metrics, log_remaining_time
@@ -163,11 +166,16 @@ class Trainer:
             self.current_flos += float(
                 self.model.floating_point_ops(inputs) if hasattr(self.model,
                                                                  "floating_point_ops") and "input_ids" in inputs else 0)
+            if (step + 1) % 1000 == 0:
+                wandb.log(dict(loss=tr_loss_step), step=step)
 
-            wandb.log(dict(epoch=epoch, loss=tr_loss_step), step=step)
-
-            if (step + 1) % 10 == 0:
-                self.compute_perplexity(self.eval_dataset)
+            # compute perplexity approx. after every 10m tokens
+            # if (step + 1) % (10 ** 7 // (epoch_iterator.batch_size * self.args.max_seq_length)) == 0:
+            if (step + 1) % 10 ** 5 == 0 and self.args.compute_perplexity:
+                ppl = self.compute_perplexity()
+                if self.args.should_log:
+                    wandb.log(dict(perplexity=ppl), step=step)
+                    logger.info(f"Perplexity at step {step}: {ppl}")
 
             if (step + 1) % self.args.gradient_accumulation_steps == 0 or (
                     (step + 1 == len(epoch_iterator)) and len(epoch_iterator) <= self.args.gradient_accumulation_steps):
@@ -295,27 +303,49 @@ class Trainer:
         self._memory_tracker.stop_and_update_metrics(outputs["metrics"])
         return outputs
 
-    def perplexity_loop(self, dataloader):
-        model = wrap_model(self.model, self.args, training=False)
+    @cached_property
+    def perplexity_encodings(self):
+        encodings = self.tokenizer("\n\n".join(list(map(lambda x: x['text'], self.eval_dataset.examples))),
+                                   return_tensors="pt")
+        return encodings
 
-        model.eval()
+    def compute_perplexity(self):
+        """https://huggingface.co/docs/transformers/perplexity"""
+        # test_dataloader = get_eval_dataloader(test_dataset, self.data_collator, self.args)
+        # outputs = self.perplexity_loop(test_dataloader)
+        if self.args.should_log:
+            logger.info(f"Computing perplexity...")
+        encodings = self.perplexity_encodings
+        # max_seq_length = self.args.max_seq_length
+        max_seq_length = 1024
+        stride = self.args.max_seq_length // 2
+        seq_len = encodings.input_ids.size(1)
 
-        for step, inputs in enumerate(dataloader):
-            outputs = perplexity_step(model, inputs, self.args)
+        nlls = []
+        prev_end_loc = 0
+        for begin_loc in tqdm(range(0, seq_len, stride)):
+            end_loc = min(begin_loc + max_seq_length, seq_len)
+            trg_len = end_loc - prev_end_loc  # may be different from stride on last loop
+            input_ids = encodings.input_ids[:, begin_loc:end_loc].to(self.args.device)
+            target_ids = input_ids.clone()
+            target_ids[:, :-trg_len] = -100
 
-            if self.args.should_log:
-                wandb.log(dict(perplexity=outputs['perplexity']))
+            with torch.no_grad():
+                outputs = self.model(input_ids, labels=target_ids)
 
-        model.train()
+                # loss is calculated using CrossEntropyLoss which averages over valid labels
+                # N.B. the model only calculates loss over trg_len - 1 labels, because it internally shifts the labels
+                # to the left by 1.
+                neg_log_likelihood = outputs.loss
 
-        return outputs
+            nlls.append(neg_log_likelihood)
 
-    def compute_perplexity(self, test_dataset):
-        test_dataloader = get_eval_dataloader(test_dataset, self.data_collator, self.args)
-        outputs = self.perplexity_loop(test_dataloader)
-        # if self.args.should_log:
-        #     logger.info(f"Perplexity on test set: {outputs['perplexity']}")
-        return outputs
+            prev_end_loc = end_loc
+            if end_loc == seq_len:
+                break
+
+        ppl = torch.exp(torch.stack(nlls).mean())
+        return ppl
 
     '''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L1852'''
 

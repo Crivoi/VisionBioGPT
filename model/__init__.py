@@ -1,9 +1,14 @@
 import torch
-from transformers import BioGptForSequenceClassification, BioGptTokenizer
+from transformers import BioGptForCausalLM, BioGptModel, BioGptPreTrainedModel, BioGptConfig, BioGptTokenizer,
+
+
+class BioGptWithCrossAttention(BioGptTokenizer):
+    pass
+
 
 if __name__ == '__main__':
     tokenizer = BioGptTokenizer.from_pretrained("microsoft/biogpt")
-    model = BioGptForSequenceClassification.from_pretrained("microsoft/biogpt",
+    model = BioGptForCausalLM.from_pretrained("microsoft/biogpt",
                                                             problem_type="multi_label_classification")
 
     inputs = tokenizer("Hello, my dog is cute", return_tensors="pt")

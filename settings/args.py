@@ -138,6 +138,8 @@ class TrainingArguments:
     greater_is_better: bool = field(default=None)
     optim: OptimizerNames = field(default="adamw_hf")
 
+    compute_perplexity: bool = field(default=False)
+
     @property
     def train_batch_size(self):
         return self.per_device_train_batch_size * max(1, self.n_gpu)
