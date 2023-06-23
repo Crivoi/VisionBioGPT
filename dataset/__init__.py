@@ -10,8 +10,9 @@ import logging
 
 from transformers import BioGptTokenizer
 
+import settings
 from settings.args import Arguments
-from settings.utils import Splits
+from settings.utils import Splits, MimicCXRLabels
 
 logger = logging.getLogger(__name__)
 
@@ -174,16 +175,15 @@ class MimicCXRDataset(Dataset):
     data_dir: str
     cache_dir: str
 
-    def __init__(self, args: Arguments, tokenizer=None, split=None, label2idx=None):
+    def __init__(self, tokenizer=None, split=None, label2idx=None):
         assert (label2idx is not None) or (split == "train")
 
-        self.data_dir = args.data_dir
-        self.cache_dir = args.cache_dir
-        self.do_lower_case = args.do_lower_case
-        self.max_seq_length = args.max_seq_length
+        self.files_dir = os.path.join(os.path.abspath('D:'), 'MIMIC-CXR-JPG', 'files_resized')
+        self.data_dir = '../data/mimic-cxr'
+        self.cache_dir = os.path.join(self.data_dir, 'full')
+        self.max_seq_length = 1024
 
-        filepath = f"{self.data_dir}/{split}.json"
-
+        filepath = os.path.join(self.data_dir, f"{split}.json")
         if self.cache_dir is not None:
             os.makedirs(self.cache_dir, exist_ok=True)
             with FileLock(os.path.join(self.cache_dir, f"{split}.lock")):
@@ -203,51 +203,30 @@ class MimicCXRDataset(Dataset):
             self.load_from_filepath(filepath, tokenizer, label2idx)
 
     def load_from_filepath(self, filepath, tokenizer, label2idx):
-        self.examples = [json.loads(l.strip()) for l in open(filepath).readlines()]
-        self.label2idx = label2idx if label2idx is not None else self.build_label2idx_from_examples()
+        self.examples = [json.loads(l.strip()) for l in open(filepath).readlines()][0]
+        self.label2idx = {code: i for i, code in enumerate([label.value for label in MimicCXRLabels])}
         self.features = self.convert_examples_to_features(self.examples, tokenizer)
         logger.info(f"Loading {len(self.features)} examples from file {filepath}")
-
-    def build_label2idx_from_examples(self):
-        labels = set()
-        for e in self.examples:
-            if self.task_name == "multilabel":
-                labels = labels.union(set(e["labels"]))
-            elif self.task_name == "singlelabel":
-                labels.add(e["label"])
-        return {l: i for i, l in enumerate(sorted(labels))}
-
-    def get_example_label(self, example):
-        if self.task_name == "singlelabel":
-            return [self.label2idx[example["label"]]]
-        elif self.task_name == "multilabel":
-            label_ids = [0] * len(self.label2idx)
-            for l in example["labels"]:
-                label_ids[self.label2idx[l]] = 1
-            return label_ids
-        raise ValueError(f"Unknown task: {self.task_name}")
 
     def convert_examples_to_features(self, examples, tokenizer, text_field="text"):
         features = []
         for example in examples:
             text = example[text_field]
-            if self.do_lower_case:
-                text = text.lower()
+
             outputs = tokenizer(
                 text,
                 padding='max_length',
                 truncation=True,
                 max_length=self.max_seq_length
             )
+
             feature = dict(
                 input_ids=outputs["input_ids"],
-                labels=self.get_example_label(example),
+                labels=example["labels_encoded"],
                 attention_mask=outputs["attention_mask"]
             )
-            features.append(feature)
 
-        # if len(examples) > 0:
-        #     logger.info(features[0].get('input_ids').size)
+            features.append(feature)
 
         return features
 
@@ -258,8 +237,33 @@ class MimicCXRDataset(Dataset):
         return self.features[i]
 
 
+def encode_labels(row):
+    positive_encoding = []
+    negative_encoding = []
+    for value in row.labels:
+        if value == 1.:
+            positive_encoding.append(1.)
+            negative_encoding.append(0.)
+        elif value == 0.:
+            negative_encoding.append(1.)
+            positive_encoding.append(0.)
+        else:
+            positive_encoding.append(0.)
+            negative_encoding.append(0.)
+    return positive_encoding + negative_encoding
+
+
+def decode_labels(labels):
+    positive_encoding = labels[:len(labels) // 2]
+    negative_encoding = labels[len(labels) // 2:]
+    decoded = []
+    for i in range(len(labels) // 2 + 1):
+        label_value = 1. if positive_encoding[i] else 0. if negative_encoding[i] else None
+        decoded.append(label_value)
+    return decoded
+
+
 if __name__ == '__main__':
-    tokenizer = BioGptTokenizer.from_pretrained('microsoft/biogpt', use_fast=True)
-    train_dataset = MimicDataset(tokenizer=tokenizer, split=Splits.train.value)
+    tokenizer = BioGptTokenizer.from_pretrained(settings.BIOGPT_CHECKPOINT, use_fast=True)
+    train_dataset = MimicCXRDataset(tokenizer=tokenizer, split=Splits.train.value)
     idx2label = {v: k for k, v in train_dataset.label2idx.items()}
-    dev_dataset = MimicDataset(tokenizer=tokenizer, split=Splits.dev.value, label2idx=train_dataset.label2idx)

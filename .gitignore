@@ -1,6 +1,7 @@
 .env
 *.jpg
 data/*
+!data/mimic-cxr/Preprocess-MIMIC-CXR.ipynb
 cache/*
 cache-temp/*
 cache_sample/*

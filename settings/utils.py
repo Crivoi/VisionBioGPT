@@ -36,6 +36,19 @@ class MimicCXRLabels(Enum):
     support_devices = 'Support Devices'
 
 
+class MimicCXRViewPositions(Enum):
+    postero_anterior = 'PA'
+    lateral = 'LATERAL'
+    antero_posterior = 'AP'
+    left_lateral = 'LL'
+    nan = 'NaN'
+    left_anterior_oblique = 'LAO'
+    right_anterior_oblique = 'RAO'
+    ap_axial = 'AP AXIAL'
+    swimmers = 'SWIMMERS'
+    pa_lld = 'PA LLD'
+
+
 def pad_sequences(sequences, max_length=None, dtype="int32", value=0):
     """[2022-Feb-17] https://github.com/LorrinWWW/Pyramid/blob/master/utils/data.py#L327"""
     batch_size = len(sequences)
