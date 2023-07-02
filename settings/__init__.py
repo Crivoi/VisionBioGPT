@@ -22,6 +22,8 @@ logger.info(f"Device: {DEVICE}")
 
 ROOT_DIR = config.ROOT_DIR
 BIOGPT_CHECKPOINT = "microsoft/biogpt"
+GPT2_CHECKPOINT = "gpt2"
+VIT_CHECKPOINT = "google/vit-base-patch16-224"
 MAX_SEQ_LENGTH = 1024
 NUM_LABELS = 50
 

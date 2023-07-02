@@ -11,7 +11,7 @@ import wandb
 from transformers import BioGptTokenizer, BioGptConfig, BioGptForSequenceClassification, BioGptModel
 
 import settings
-from dataset import MimicDataset, Collator
+from dataset import Collator, MimicCXRDataset, CollatorForCXR
 from metrics import Metric
 from pipeline import Trainer
 from pipeline.callback import EarlyStoppingCallback
@@ -28,7 +28,7 @@ def parse_args() -> Arguments:
     args: Arguments = parser.parse_args_into_dataclasses()[0]
     device = args._setup_devices
     set_logging_format(
-        os.path.join(args.output_dir, "tapt_logs", f"seq_cls_tapt_{datetime.now().strftime('%H%M')}.log"))
+        os.path.join(args.output_dir, "tapt_cxr_logs", f"seq_cls_tapt_cxr_{datetime.now().strftime('%H%M')}.log"))
     set_seed(args.seed)
     if args.should_log:
         logger.info("**************************************************")
@@ -47,22 +47,15 @@ def load_data(args: Arguments) -> Tuple:
         logger.info("**************************************************")
 
     tokenizer = BioGptTokenizer.from_pretrained(settings.BIOGPT_CHECKPOINT, use_fast=True)
-    data_collator = Collator(tokenizer=tokenizer, max_seq_length=args.max_seq_length)
+    data_collator = CollatorForCXR(tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 
-    train_dataset: MimicDataset = MimicDataset(
+    train_dataset: MimicCXRDataset = MimicCXRDataset(
         args=args,
         tokenizer=tokenizer,
         split=Splits.train.value,
     )
 
-    dev_dataset: MimicDataset = MimicDataset(
-        args=args,
-        tokenizer=tokenizer,
-        split=Splits.dev.value,
-        label2idx=train_dataset.label2idx,
-    )
-
-    test_dataset: MimicDataset = MimicDataset(
+    test_dataset: MimicCXRDataset = MimicCXRDataset(
         args=args,
         tokenizer=tokenizer,
         split=Splits.test.value,
@@ -71,7 +64,7 @@ def load_data(args: Arguments) -> Tuple:
 
     idx2label: Dict = dict((v, k) for k, v in train_dataset.label2idx.items())
 
-    return tokenizer, train_dataset, dev_dataset, test_dataset, idx2label, data_collator
+    return tokenizer, train_dataset, test_dataset, idx2label, data_collator
 
 
 def build_trainer(tokenizer, train_dataset, dev_dataset, args, idx2label, data_collator) -> Tuple[Trainer, BioGptModel]:
@@ -80,9 +73,9 @@ def build_trainer(tokenizer, train_dataset, dev_dataset, args, idx2label, data_c
         logger.info("*               Build the trainer                *")
         logger.info("**************************************************")
 
-    config: BioGptConfig = BioGptConfig.from_pretrained(settings.BIOGPT_CHECKPOINT, num_labels=settings.NUM_LABELS)
+    config: BioGptConfig = BioGptConfig.from_pretrained(settings.BIOGPT_CHECKPOINT, num_labels=28)
     model: BioGptModel = BioGptForSequenceClassification.from_pretrained(settings.BIOGPT_CHECKPOINT, config=config)
-    lm_state_dict = torch.load(os.path.join('..', 'model_output', 'causal_lm_tapt_weights_cpu.bin'))
+    lm_state_dict = torch.load(os.path.join(os.pardir, 'model_output', 'causal_lm_tapt_weights_cpu.bin'))
     lm_state_dict.pop('output_projection.weight')
     lm_state_dict['score.weight'] = model.state_dict()['score.weight']
     model.load_state_dict(lm_state_dict)
@@ -117,7 +110,7 @@ def train(tokenizer, train_dataset, dev_dataset, args, idx2label, data_collator)
 
     trainer, model = build_trainer(tokenizer, train_dataset, dev_dataset, args, idx2label, data_collator)
     train_metrics = trainer.train()
-    dev_metrics = trainer.predict(dev_dataset, metric_key_prefix="dev")["metrics"]
+    dev_metrics = trainer.predict(dev_dataset, metric_key_prefix=Splits.dev.value)["metrics"]
 
     args.complete_running_time = print_seconds(time.time() - args.init_args_time)
 
@@ -154,7 +147,7 @@ def evaluate(model, test_dataset, args, idx2label, data_collator) -> BioGptModel
 
     test_outputs = evaluator.predict(test_dataset, metric_key_prefix="test")
 
-    log_metrics(split=Splits.dev.value, metrics=test_outputs["metrics"])
+    log_metrics(split=Splits.test.value, metrics=test_outputs["metrics"])
 
     if args.output_predictions_filepath is not None:
         preds = Metric.get_labels_from_logits(test_outputs["logits"], idx2label, args.task_name)
@@ -179,8 +172,8 @@ def main():
 
     args: Arguments = parse_args()
 
-    with wandb.init(entity='andrei-crivoi1997', project="biogpt-seq-cls-tapt", config=args.__dict__):
-        tokenizer, train_dataset, dev_dataset, test_dataset, idx2label, data_collator = load_data(args)
+    with wandb.init(entity='andrei-crivoi1997', project="biogpt-seq-cls-tapt-cxr", config=args.__dict__):
+        tokenizer, train_dataset, test_dataset, idx2label, data_collator = load_data(args)
         kwargs = dict(
             args=args,
             idx2label=idx2label,
@@ -190,7 +183,7 @@ def main():
         model = train(
             tokenizer=tokenizer,
             train_dataset=train_dataset,
-            dev_dataset=dev_dataset,
+            dev_dataset=test_dataset,
             **kwargs
         )
 
@@ -208,7 +201,7 @@ def main():
             model.state_dict(),
             os.path.join(
                 runs_dir,
-                f"model_seq_classification_tapt_{datetime.now().strftime('%H%M')}.bin"
+                f"model_seq_classification_tapt_cxr_{datetime.now().strftime('%H%M')}.bin"
             )
         )
 

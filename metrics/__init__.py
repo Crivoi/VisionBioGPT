@@ -12,7 +12,7 @@ class Metric:
         self.idx2label = idx2label
 
     def __call__(self, all_logits, all_golds):
-        pred_labels = Metric.get_labels_from_logitis(all_logits, self.idx2label, self.task_name)
+        pred_labels = Metric.get_labels_from_logits(all_logits, self.idx2label, self.task_name)
 
         if self.task_name == "singlelabel":
             gold_labels = [self.idx2label[g] for g in all_golds.tolist()]
@@ -58,7 +58,7 @@ class Metric:
             return metrics
 
     @staticmethod
-    def get_labels_from_logitis(all_logits, idx2label, task_name="singlelabel"):
+    def get_labels_from_logits(all_logits, idx2label, task_name="singlelabel"):
         if task_name == "multilabel":
             return Metric.get_multilabels_from_logitis(all_logits, idx2label)
         elif task_name == "singlelabel":

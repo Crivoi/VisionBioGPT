@@ -55,13 +55,6 @@ def load_data(args: Arguments) -> Tuple:
         split=Splits.train.value,
     )
 
-    dev_dataset: MimicCXRDataset = MimicCXRDataset(
-        args=args,
-        tokenizer=tokenizer,
-        split=Splits.dev.value,
-        label2idx=train_dataset.label2idx,
-    )
-
     test_dataset: MimicCXRDataset = MimicCXRDataset(
         args=args,
         tokenizer=tokenizer,
@@ -71,12 +64,12 @@ def load_data(args: Arguments) -> Tuple:
 
     idx2label: Dict = dict((v, k) for k, v in train_dataset.label2idx.items())
 
-    return tokenizer, train_dataset, dev_dataset, test_dataset, idx2label, data_collator
+    return tokenizer, train_dataset, test_dataset, idx2label, data_collator
 
 
 def main():
     args: Arguments = parse_args()
-    tokenizer, train_dataset, dev_dataset, test_dataset, idx2label, data_collator = load_data(args)
+    tokenizer, train_dataset, test_dataset, idx2label, data_collator = load_data(args)
     return 0
 
 

@@ -152,7 +152,7 @@ def evaluate(model, test_dataset, args, idx2label, data_collator) -> BioGptModel
     log_metrics(split=Splits.dev.value, metrics=test_outputs["metrics"])
 
     if args.output_predictions_filepath is not None:
-        preds = Metric.get_labels_from_logitis(test_outputs["logits"], idx2label, args.task_name)
+        preds = Metric.get_labels_from_logits(test_outputs["logits"], idx2label, args.task_name)
         write_object_to_json_file(preds, args.output_predictions_filepath)
 
     args.complete_running_time = print_seconds(time.time() - args.init_args_time)

@@ -1,16 +1,15 @@
-import collections
-import json
 import os
-
+import json
 import torch
-from filelock import FileLock
-from torch.utils.data import Dataset
-
 import logging
 
+from tqdm import tqdm
+from filelock import FileLock
+from torch.utils.data import Dataset
 from transformers import BioGptTokenizer
 
 import settings
+
 from settings.args import Arguments
 from settings.utils import Splits, MimicCXRLabels
 
@@ -175,13 +174,13 @@ class MimicCXRDataset(Dataset):
     data_dir: str
     cache_dir: str
 
-    def __init__(self, tokenizer=None, split=None, label2idx=None):
+    def __init__(self, args: Arguments = None, tokenizer=None, split=None, label2idx=None):
         assert (label2idx is not None) or (split == "train")
 
         self.files_dir = os.path.join(os.path.abspath('D:'), 'MIMIC-CXR-JPG', 'files_resized')
         self.data_dir = '../data/mimic-cxr'
-        self.cache_dir = os.path.join(self.data_dir, 'full')
-        self.max_seq_length = 1024
+        self.cache_dir = os.path.join(self.data_dir, args.cache_dir)
+        self.max_seq_length = args.max_seq_length or 1024
 
         filepath = os.path.join(self.data_dir, f"{split}.json")
         if self.cache_dir is not None:
@@ -195,23 +194,27 @@ class MimicCXRDataset(Dataset):
                         f"Loading {len(self.features)} examples from cached directory {self.cache_dir}, split {split}"
                     )
                 else:
-                    self.load_from_filepath(filepath, tokenizer, label2idx)
+                    self.load_from_filepath(filepath, tokenizer)
                     torch.save(self.examples, os.path.join(self.cache_dir, f"{split}.examples"))
                     torch.save(self.label2idx, os.path.join(self.cache_dir, f"{split}.label2idx"))
                     torch.save(self.features, os.path.join(self.cache_dir, f"{split}.features"))
         else:
-            self.load_from_filepath(filepath, tokenizer, label2idx)
+            self.load_from_filepath(filepath, tokenizer)
 
-    def load_from_filepath(self, filepath, tokenizer, label2idx):
+    def load_from_filepath(self, filepath, tokenizer):
         self.examples = [json.loads(l.strip()) for l in open(filepath).readlines()][0]
-        self.label2idx = {code: i for i, code in enumerate([label.value for label in MimicCXRLabels])}
+        self.label2idx = {code: i for i, code in enumerate([label.value for label in MimicCXRLabels] +
+                                                           [f'-{label.value}' for label in MimicCXRLabels])}
+
         self.features = self.convert_examples_to_features(self.examples, tokenizer)
         logger.info(f"Loading {len(self.features)} examples from file {filepath}")
 
     def convert_examples_to_features(self, examples, tokenizer, text_field="text"):
         features = []
-        for example in examples:
+        for example in tqdm(examples):
             text = example[text_field]
+            assert len(example["path"]) == len(example["view_position"])
+            assert 2 * len(example["labels"]) == len(example["labels_encoded"])
 
             outputs = tokenizer(
                 text,
@@ -223,6 +226,8 @@ class MimicCXRDataset(Dataset):
             feature = dict(
                 input_ids=outputs["input_ids"],
                 labels=example["labels_encoded"],
+                path=example["path"],
+                view_position=example["view_position"],
                 attention_mask=outputs["attention_mask"]
             )
 
@@ -235,6 +240,28 @@ class MimicCXRDataset(Dataset):
 
     def __getitem__(self, i):
         return self.features[i]
+
+
+class CollatorForCXR:
+    def __init__(self, tokenizer, max_seq_length, task_name="multilabel"):
+        self.tokenizer = tokenizer
+        self.max_seq_length = max_seq_length
+        self.task_name = task_name
+
+    def __call__(self, features):
+        max_seq_length = max([len(f["input_ids"]) for f in features])
+        max_seq_length = min(max_seq_length, self.max_seq_length)
+
+        batch = self.tokenizer.pad(features, padding=True, max_length=max_seq_length)
+        batch = {k: batch[k] for k in ['input_ids', 'labels', 'attention_mask']}
+        batch = {k: torch.tensor(v, dtype=torch.int64) for k, v in batch.items()}
+
+        assert self.task_name in ["singlelabel", "multilabel"]
+        if self.task_name == "singlelabel":
+            batch["labels"] = torch.tensor([f["labels"][0] for f in features], dtype=torch.int64)
+        else:
+            batch["labels"] = torch.tensor([f["labels"] for f in features], dtype=torch.float)
+        return batch
 
 
 def encode_labels(row):
