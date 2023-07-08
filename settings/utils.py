@@ -19,6 +19,11 @@ class DataSamples(Enum):
     full = 'full'
 
 
+class ImgSizes(Enum):
+    large = (384, 384)
+    small = (224, 224)
+
+
 class MimicCXRLabels(Enum):
     atelectasis = 'Atelectasis'
     cardiomegaly = 'Cardiomegaly'

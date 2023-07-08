@@ -1,13 +1,27 @@
+import logging
 import math
+import random
 from typing import Optional, Tuple, Union, Any
 
 import torch
 from torch import nn
+from torch.nn import CrossEntropyLoss
 from transformers import BioGptConfig, BioGptModel, BioGptForCausalLM, Conv1D, BertForMaskedLM
 from transformers.activations import ACT2FN
 from transformers.modeling_outputs import CausalLMOutputWithCrossAttentions, BaseModelOutputWithPastAndCrossAttentions
 from transformers.models.biogpt.modeling_biogpt import BioGptAttention, BioGptDecoderLayer, \
     BioGptLearnedPositionalEmbedding
+
+from settings.utils import ImgSizes
+
+logger = logging.getLogger(__name__)
+
+
+class BioGptConfigWithCrossAttention(BioGptConfig):
+    def __init__(self, cross_attention_reduce_factor, image_shape=ImgSizes.large.value, **kwargs):
+        super().__init__(**kwargs)
+        self.cross_attention_reduce_factor = cross_attention_reduce_factor
+        self.image_shape = image_shape
 
 
 class BioGptAttentionWithCross(BioGptAttention):
@@ -18,33 +32,22 @@ class BioGptAttentionWithCross(BioGptAttention):
             dropout: float = 0.0,
             is_decoder: bool = False,
             bias: bool = True,
+            config: BioGptConfigWithCrossAttention = None,
             is_cross_attention=False
     ):
-        super().__init__()
-        self.embed_dim = embed_dim
-        self.num_heads = num_heads
-        self.dropout = dropout
-        self.head_dim = embed_dim // num_heads
+        super().__init__(embed_dim, num_heads, dropout, is_decoder, bias)
 
-        if (self.head_dim * num_heads) != self.embed_dim:
-            raise ValueError(
-                f"embed_dim must be divisible by num_heads (got `embed_dim`: {self.embed_dim}"
-                f" and `num_heads`: {num_heads})."
-            )
-        self.scaling = self.head_dim ** -0.5
-        self.is_decoder = is_decoder
         self.is_cross_attention = is_cross_attention
-
-        self.k_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
-        self.v_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
-        self.q_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
-        self.out_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
+        self.cross_attention_reduce_factor = config.cross_attention_reduce_factor
+        self.image_shape = config.image_shape
+        self.image_size = self.image_shape[0] * 2
 
         if self.is_cross_attention:
-            self.k_proj = Conv1D(embed_dim, embed_dim, bias=bias)
-            self.v_proj = Conv1D(embed_dim, embed_dim, bias=bias)
-            self.q_proj = Conv1D(embed_dim, embed_dim, bias=bias)
-            self.out_proj = Conv1D(embed_dim, embed_dim, bias=bias)
+            self.k_proj = nn.Linear(self.image_size, int(embed_dim / self.cross_attention_reduce_factor), bias=bias)
+            self.v_proj = nn.Linear(self.image_size, int(embed_dim / self.cross_attention_reduce_factor), bias=bias)
+            self.q_proj = nn.Linear(embed_dim, int(embed_dim / self.cross_attention_reduce_factor), bias=bias)
+            self.out_proj = nn.Linear(int(embed_dim / self.cross_attention_reduce_factor), embed_dim, bias=bias)
+            self.embed_dim = int(embed_dim / self.cross_attention_reduce_factor)
 
     def forward(
             self,
@@ -59,16 +62,8 @@ class BioGptAttentionWithCross(BioGptAttention):
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
 
-        if encoder_hidden_states is not None:
-            if not hasattr(self, "q_attn"):
-                raise ValueError(
-                    "If class is used as cross attention, the weights `q_attn` have to be defined. "
-                    "Please make sure to instantiate class with `BioGPTAttentionWithCross(..., is_cross_attention=True)`."
-                )
-
-        # if key_value_states are provided this layer is used as a cross-attention layer
-        # for the decoder
-        is_cross_attention = encoder_hidden_states is not None
+        # if key_value_states are provided this layer is used as a cross-attention layer for the decoder
+        is_cross_attention = key_value_states is not None
 
         bsz, tgt_len, _ = hidden_states.size()
 
@@ -90,8 +85,8 @@ class BioGptAttentionWithCross(BioGptAttention):
             # cross_attentions
             # key_states = self._shape(self.k_proj(key_value_states), -1, bsz)
             # value_states = self._shape(self.v_proj(key_value_states), -1, bsz)
-            key_states = self._shape(self.k_proj(encoder_hidden_states), -1, bsz)
-            value_states = self._shape(self.v_proj(encoder_hidden_states), -1, bsz)
+            key_states = self._shape(self.k_proj(key_value_states), -1, bsz)
+            value_states = self._shape(self.v_proj(key_value_states), -1, bsz)
         elif past_key_value is not None:
             # reuse k, v, self_attention
             key_states = self._shape(self.k_proj(hidden_states), -1, bsz)
@@ -180,29 +175,19 @@ class BioGptAttentionWithCross(BioGptAttention):
 
 
 class BioGptDecoderLayerWithCrossAttention(BioGptDecoderLayer):
-    def __init__(self, config: BioGptConfig):
-        super().__init__()
-        self.embed_dim = config.hidden_size
-
-        self.self_attn = BioGptAttention(
-            embed_dim=self.embed_dim,
-            num_heads=config.num_attention_heads,
-            dropout=config.attention_probs_dropout_prob,
-            is_decoder=True,
-        )
-        self.dropout = config.hidden_dropout_prob
-        self.activation_fn = ACT2FN[config.hidden_act]
-        self.activation_dropout = config.activation_dropout
-
-        self.self_attn_layer_norm = nn.LayerNorm(self.embed_dim)
-
-        self.fc1 = nn.Linear(self.embed_dim, config.intermediate_size)
-        self.fc2 = nn.Linear(config.intermediate_size, self.embed_dim)
-        self.final_layer_norm = nn.LayerNorm(self.embed_dim)
+    def __init__(self, config: BioGptConfigWithCrossAttention):
+        super().__init__(config)
 
         if config.add_cross_attention:
-            self.cross_attention = BioGptAttentionWithCross(config, is_cross_attention=True)
-            self.ln_cross_attention = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+            self.cross_attn = BioGptAttentionWithCross(
+                embed_dim=self.embed_dim,
+                num_heads=config.num_attention_heads,
+                dropout=config.attention_probs_dropout_prob,
+                is_decoder=True,
+                is_cross_attention=True,
+                config=config,
+            )
+            self.cross_attn_layer_norm = nn.LayerNorm(self.embed_dim)
 
     def forward(
             self,
@@ -213,7 +198,8 @@ class BioGptDecoderLayerWithCrossAttention(BioGptDecoderLayer):
             output_attentions: Optional[bool] = False,
             use_cache: Optional[bool] = True,
             encoder_hidden_states: Optional[torch.Tensor] = None,
-            encoder_attention_mask: Optional[torch.FloatTensor] = None
+            encoder_attention_mask: Optional[torch.FloatTensor] = None,
+            cross_attn_head_mask: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         residual = hidden_states
 
@@ -233,6 +219,27 @@ class BioGptDecoderLayerWithCrossAttention(BioGptDecoderLayer):
         hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
         hidden_states = residual + hidden_states
 
+        # Cross-Attention
+        if encoder_hidden_states is not None:
+            residual = hidden_states
+            hidden_states = self.cross_attn_layer_norm(hidden_states)
+
+            # cross_attn cached key/values tuple is at positions 3,4 of present_key_value tuple
+            cross_attn_past_key_value = past_key_value[-2:] if past_key_value is not None else None
+            hidden_states, cross_attn_weights, cross_attn_present_key_value = self.cross_attn(
+                hidden_states=hidden_states,
+                key_value_states=encoder_hidden_states,
+                attention_mask=encoder_attention_mask,
+                layer_head_mask=cross_attn_head_mask,
+                past_key_value=cross_attn_past_key_value,
+                output_attentions=output_attentions,
+            )
+            hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
+            hidden_states = residual + hidden_states
+
+            # add cross-attn to positions 3,4 of present_key_value tuple
+            present_key_value = present_key_value + cross_attn_present_key_value
+
         # Fully Connected
         residual = hidden_states
         hidden_states = self.final_layer_norm(hidden_states)
@@ -243,24 +250,24 @@ class BioGptDecoderLayerWithCrossAttention(BioGptDecoderLayer):
         hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
         hidden_states = residual + hidden_states
 
-        if encoder_hidden_states is not None:
-            if not hasattr(self, "cross_attention"):
-                raise ValueError(
-                    f"If `encoder_hidden_states` are passed, {self} has to be instantiated with "
-                    "cross-attention layers by setting `config.add_cross_attention=True`"
-                )
-            residual = hidden_states
-            hidden_states = self.ln_cross_attn(hidden_states)
-            cross_attn_outputs = self.cross_attention(
-                hidden_states,
-                attention_mask=attention_mask,
-                encoder_hidden_states=encoder_hidden_states,
-                encoder_attention_mask=encoder_attention_mask,
-                output_attentions=output_attentions,
-            )
-            attn_output = cross_attn_outputs[0]
-            # residual connection
-            hidden_states = residual + attn_output
+        # if encoder_hidden_states is not None:
+        #     if not hasattr(self, "cross_attention"):
+        #         raise ValueError(
+        #             f"If `encoder_hidden_states` are passed, {self} has to be instantiated with "
+        #             "cross-attention layers by setting `config.add_cross_attention=True`"
+        #         )
+        #     residual = hidden_states
+        #     hidden_states = self.ln_cross_attn(hidden_states)
+        #     cross_attn_outputs = self.cross_attention(
+        #         hidden_states,
+        #         attention_mask=attention_mask,
+        #         encoder_hidden_states=encoder_hidden_states,
+        #         encoder_attention_mask=encoder_attention_mask,
+        #         output_attentions=output_attentions,
+        #     )
+        #     attn_output = cross_attn_outputs[0]
+        #     # residual connection
+        #     hidden_states = residual + attn_output
 
         outputs = (hidden_states,)
 
@@ -274,28 +281,12 @@ class BioGptDecoderLayerWithCrossAttention(BioGptDecoderLayer):
 
 
 class BioGptModelWithCrossAttention(BioGptModel):
-    def __init__(self, config: BioGptConfig):
+    def __init__(self, config: BioGptConfigWithCrossAttention):
         super().__init__(config)
-        self.config = config
-        self.layerdrop = config.layerdrop
-        self.dropout = config.hidden_dropout_prob
-        self.embed_dim = config.hidden_size
-        self.padding_idx = config.pad_token_id
-        self.embed_scale = math.sqrt(config.hidden_size) if config.scale_embedding else 1.0
-
-        self.embed_tokens = nn.Embedding(config.vocab_size, self.embed_dim, self.padding_idx)
-        self.embed_positions = BioGptLearnedPositionalEmbedding(config.max_position_embeddings, self.embed_dim)
-
         self.layers = nn.ModuleList(
-            [BioGptDecoderLayerWithCrossAttention(config)
+            [BioGptDecoderLayerWithCrossAttention(config=config)
              for _ in range(config.num_hidden_layers)]
         )
-
-        self.layer_norm = nn.LayerNorm(self.embed_dim)
-
-        self.gradient_checkpointing = False
-        # Initialize weights and apply final processing
-        self.post_init()
 
     def forward(
             self,
@@ -309,20 +300,142 @@ class BioGptModelWithCrossAttention(BioGptModel):
             output_hidden_states: Optional[bool] = None,
             return_dict: Optional[bool] = None,
             encoder_hidden_states: Optional[torch.Tensor] = None,
+            encoder_attention_mask: Optional[torch.FloatTensor] = None,
+            cross_attn_head_mask: Optional[torch.Tensor] = None,
     ) -> Union[Tuple, BaseModelOutputWithPastAndCrossAttentions]:
-        return super().forward(input_ids, attention_mask, head_mask, inputs_embeds, past_key_values, use_cache,
-                               output_attentions, output_hidden_states, return_dict, encoder_hidden_states)
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        # retrieve input_ids and inputs_embeds
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        elif input_ids is not None:
+            input = input_ids
+            input_shape = input.size()
+        elif inputs_embeds is not None:
+            input_shape = inputs_embeds.size()[:-1]
+            input = inputs_embeds[:, :, -1]
+        else:
+            raise ValueError("You have to specify either input_ids or inputs_embeds")
+
+        # past_key_values_length
+        past_key_values_length = past_key_values[0][0].shape[2] if past_key_values is not None else 0
+
+        if inputs_embeds is None:
+            inputs_embeds = self.embed_tokens(input) * self.embed_scale
+
+        if attention_mask is None:
+            attention_mask = torch.ones(inputs_embeds.shape[:2], dtype=torch.bool, device=inputs_embeds.device)
+        # embed positions
+        positions = self.embed_positions(attention_mask, past_key_values_length)
+
+        attention_mask = self._prepare_decoder_attention_mask(
+            attention_mask, input_shape, inputs_embeds, past_key_values_length
+        )
+
+        hidden_states = inputs_embeds + positions
+
+        hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
+
+        if self.gradient_checkpointing and self.training:
+            if use_cache:
+                logger.warning_once(
+                    "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
+                )
+                use_cache = False
+
+        all_hidden_states = () if output_hidden_states else None
+        all_self_attns = () if output_attentions else None
+        all_cross_attentions = () if (output_attentions and encoder_hidden_states is not None) else None
+        next_decoder_cache = () if use_cache else None
+
+        # check if head_mask/cross_attn_head_mask has a correct number of layers specified if desired
+        for attn_mask, mask_name in zip([head_mask, cross_attn_head_mask], ["head_mask", "cross_attn_head_mask"]):
+            if attn_mask is not None:
+                if attn_mask.size()[0] != len(self.layers):
+                    raise ValueError(
+                        f"The `{mask_name}` should be specified for {len(self.layers)} layers, but it is for"
+                        f" {head_mask.size()[0]}."
+                    )
+
+        for idx, decoder_layer in enumerate(self.layers):
+            # add LayerDrop (see https://arxiv.org/abs/1909.11556 for description)
+            if output_hidden_states:
+                all_hidden_states += (hidden_states,)
+            dropout_probability = random.uniform(0, 1)
+            if self.training and (dropout_probability < self.layerdrop):
+                continue
+
+            past_key_value = past_key_values[idx] if past_key_values is not None else None
+
+            if self.gradient_checkpointing and self.training:
+
+                def create_custom_forward(module):
+                    def custom_forward(*inputs):
+                        # None for past_key_value
+                        return module(*inputs, output_attentions, use_cache)
+
+                    return custom_forward
+
+                layer_outputs = torch.utils.checkpoint.checkpoint(
+                    create_custom_forward(decoder_layer),
+                    hidden_states,
+                    attention_mask,
+                    head_mask[idx] if head_mask is not None else None,
+                    None,
+                )
+            else:
+                layer_outputs = decoder_layer(
+                    hidden_states,
+                    attention_mask=attention_mask,
+                    layer_head_mask=head_mask[idx] if head_mask is not None else None,
+                    past_key_value=past_key_value,
+                    output_attentions=output_attentions,
+                    use_cache=use_cache,
+                    encoder_hidden_states=encoder_hidden_states,
+                    encoder_attention_mask=encoder_attention_mask,
+                    cross_attn_head_mask=cross_attn_head_mask[idx] if cross_attn_head_mask is not None else None
+                )
+
+            hidden_states = layer_outputs[0]
+
+            if use_cache:
+                next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
+
+            if output_attentions:
+                all_self_attns += (layer_outputs[1],)
+
+        # add hidden states from the last decoder layer
+        if output_hidden_states:
+            all_hidden_states += (hidden_states,)
+
+        hidden_states = self.layer_norm(hidden_states)
+
+        next_cache = next_decoder_cache if use_cache else None
+
+        if not return_dict:
+            return tuple(
+                v
+                for v in [hidden_states, next_cache, all_hidden_states, all_self_attns, all_cross_attentions]
+                if v is not None
+            )
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=hidden_states,
+            past_key_values=next_cache,
+            hidden_states=all_hidden_states,
+            attentions=all_self_attns,
+            cross_attentions=all_cross_attentions,
+        )
 
 
 class BioGptForCausalLMWithCrossAttention(BioGptForCausalLM):
-    def __init__(self, config: BioGptConfig):
+    def __init__(self, config: BioGptConfigWithCrossAttention):
         super().__init__(config)
-
         self.biogpt = BioGptModelWithCrossAttention(config)
-        self.output_projection = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
-
-        # Initialize weights and apply final processing
-        self.post_init()
 
     def forward(
             self,
@@ -337,6 +450,46 @@ class BioGptForCausalLMWithCrossAttention(BioGptForCausalLM):
             output_hidden_states: Optional[bool] = None,
             return_dict: Optional[bool] = None,
             encoder_hidden_states: Optional[torch.Tensor] = None,
+            encoder_attention_mask: Optional[torch.FloatTensor] = None,
+            cross_attn_head_mask: Optional[torch.Tensor] = None,
     ) -> Union[Tuple, CausalLMOutputWithCrossAttentions]:
-        return super().forward(input_ids, attention_mask, head_mask, inputs_embeds, past_key_values, labels, use_cache,
-                               output_attentions, output_hidden_states, return_dict, encoder_hidden_states)
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        outputs = self.biogpt(
+            input_ids,
+            attention_mask=attention_mask,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            past_key_values=past_key_values,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            encoder_hidden_states=encoder_hidden_states,
+            encoder_attention_mask=encoder_attention_mask,
+            cross_attn_head_mask=cross_attn_head_mask
+        )
+
+        sequence_output = outputs[0]
+        prediction_scores = self.output_projection(sequence_output)
+
+        lm_loss = None
+        if labels is not None:
+            # we are doing next-token prediction; shift prediction scores and input ids by one
+            shifted_prediction_scores = prediction_scores[:, :-1, :].contiguous()
+            labels = labels[:, 1:].contiguous()
+            loss_fct = CrossEntropyLoss()
+            lm_loss = loss_fct(shifted_prediction_scores.view(-1, self.config.vocab_size), labels.view(-1))
+
+        if not return_dict:
+            output = (prediction_scores,) + outputs[1:]
+            return ((lm_loss,) + output) if lm_loss is not None else output
+
+        return CausalLMOutputWithCrossAttentions(
+            loss=lm_loss,
+            logits=prediction_scores,
+            past_key_values=outputs.past_key_values,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+            cross_attentions=outputs.cross_attentions,
+        )
