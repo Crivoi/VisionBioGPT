@@ -1,17 +1,21 @@
 import os
 import json
+import random
+
 import torch
 import logging
 
+from PIL import Image
 from tqdm import tqdm
 from filelock import FileLock
 from torch.utils.data import Dataset
-from transformers import BioGptTokenizer
+from transformers import BioGptTokenizer, ViTImageProcessor
+from transformers.image_processing_utils import BaseImageProcessor
 
 import settings
 
 from settings.args import Arguments
-from settings.utils import Splits, MimicCXRLabels
+from settings.utils import Splits, MimicCXRLabels, ViewPositionTokens, MimicCXRViewPositions
 
 logger = logging.getLogger(__name__)
 
@@ -173,14 +177,17 @@ class MimicCXRDataset(Dataset):
     max_seq_length: int
     data_dir: str
     cache_dir: str
+    processor: BaseImageProcessor
+    tokenizer: BioGptTokenizer
 
-    def __init__(self, args: Arguments = None, tokenizer=None, split=None, label2idx=None):
+    def __init__(self, args: Arguments = None, tokenizer=None, processor=None, split=None, label2idx=None):
         assert (label2idx is not None) or (split == "train")
-
-        self.files_dir = os.path.join(os.path.abspath('D:'), 'MIMIC-CXR-JPG', 'files_resized')
-        self.data_dir = '../data/mimic-cxr'
+        self.data_dir = os.path.join(os.pardir, 'data', 'mimic-cxr')
         self.cache_dir = os.path.join(self.data_dir, args.cache_dir)
-        self.max_seq_length = args.max_seq_length or 1024
+        self.max_seq_length = args.max_seq_length
+
+        self.processor = processor
+        self.tokenizer = tokenizer
 
         filepath = os.path.join(self.data_dir, f"{split}.json")
         if self.cache_dir is not None:
@@ -194,41 +201,47 @@ class MimicCXRDataset(Dataset):
                         f"Loading {len(self.features)} examples from cached directory {self.cache_dir}, split {split}"
                     )
                 else:
-                    self.load_from_filepath(filepath, tokenizer)
+                    self.load_from_filepath(filepath)
                     torch.save(self.examples, os.path.join(self.cache_dir, f"{split}.examples"))
                     torch.save(self.label2idx, os.path.join(self.cache_dir, f"{split}.label2idx"))
                     torch.save(self.features, os.path.join(self.cache_dir, f"{split}.features"))
         else:
-            self.load_from_filepath(filepath, tokenizer)
+            self.load_from_filepath(filepath)
 
-    def load_from_filepath(self, filepath, tokenizer):
+    def extract_img_features(self, path):
+        with Image.open(path).convert('RGB') as img:
+            img_inputs = self.processor(img, return_tensors="pt")
+            return img_inputs['pixel_values']
+
+    def load_from_filepath(self, filepath):
         self.examples = [json.loads(l.strip()) for l in open(filepath).readlines()][0]
         self.label2idx = {code: i for i, code in enumerate([label.value for label in MimicCXRLabels] +
                                                            [f'-{label.value}' for label in MimicCXRLabels])}
-
-        self.features = self.convert_examples_to_features(self.examples, tokenizer)
+        self.features = self.convert_examples_to_features(self.examples)
         logger.info(f"Loading {len(self.features)} examples from file {filepath}")
 
-    def convert_examples_to_features(self, examples, tokenizer, text_field="text"):
+    def convert_examples_to_features(self, examples, text_field="text"):
         features = []
         for example in tqdm(examples):
-            text = example[text_field]
             assert len(example["path"]) == len(example["view_position"])
             assert 2 * len(example["labels"]) == len(example["labels_encoded"])
 
-            outputs = tokenizer(
-                text,
+            index = random.randint(0, len(example["path"]) - 1)
+            pixel_values = self.extract_img_features(os.path.join(self.data_dir, example["path"][index]))
+            view_position = ViewPositionTokens[example["view_position"][index]]
+            text = f"<{view_position}> {example[text_field]}"
+            text_outputs = self.tokenizer(
+                text=text,
                 padding='max_length',
                 truncation=True,
                 max_length=self.max_seq_length
             )
 
             feature = dict(
-                input_ids=outputs["input_ids"],
+                input_ids=text_outputs["input_ids"],
+                attention_mask=text_outputs["attention_mask"],
+                pixel_values=pixel_values,
                 labels=example["labels_encoded"],
-                path=example["path"],
-                view_position=example["view_position"],
-                attention_mask=outputs["attention_mask"]
             )
 
             features.append(feature)
@@ -253,8 +266,12 @@ class CollatorForCXR:
         max_seq_length = min(max_seq_length, self.max_seq_length)
 
         batch = self.tokenizer.pad(features, padding=True, max_length=max_seq_length)
-        batch = {k: batch[k] for k in ['input_ids', 'labels', 'attention_mask']}
-        batch = {k: torch.tensor(v, dtype=torch.int64) for k, v in batch.items()}
+
+        for k in ['input_ids', 'attention_mask']:
+            batch[f'decoder_{k}'] = torch.tensor(batch[k], dtype=torch.int64)
+            batch.pop(k)
+
+        batch['pixel_values'] = torch.stack(batch['pixel_values']).squeeze()
 
         assert self.task_name in ["singlelabel", "multilabel"]
         if self.task_name == "singlelabel":
@@ -292,5 +309,6 @@ def decode_labels(labels):
 
 if __name__ == '__main__':
     tokenizer = BioGptTokenizer.from_pretrained(settings.BIOGPT_CHECKPOINT, use_fast=True)
-    train_dataset = MimicCXRDataset(tokenizer=tokenizer, split=Splits.train.value)
+    processor = ViTImageProcessor.from_pretrained(settings.VIT_CHECKPOINT)
+    train_dataset = MimicCXRDataset(tokenizer=tokenizer, processor=processor, split=Splits.train.value)
     idx2label = {v: k for k, v in train_dataset.label2idx.items()}

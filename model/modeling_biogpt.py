@@ -1,21 +1,24 @@
-import logging
-import math
-import random
-from typing import Optional, Tuple, Union, Any
+from dataclasses import dataclass
 
 import torch
+import random
+import logging
+
 from torch import nn
-from torch.nn import CrossEntropyLoss
-from transformers import BioGptConfig, BioGptModel, BioGptForCausalLM, Conv1D, BertForMaskedLM
-from transformers.activations import ACT2FN
-from transformers.modeling_outputs import CausalLMOutputWithCrossAttentions, BaseModelOutputWithPastAndCrossAttentions
-from transformers.models.biogpt.modeling_biogpt import BioGptAttention, BioGptDecoderLayer, \
-    BioGptLearnedPositionalEmbedding
+from torch.nn import CrossEntropyLoss, MSELoss, BCEWithLogitsLoss
+from typing import Optional, Tuple, Union
+from transformers.models.biogpt.modeling_biogpt import BioGptAttention, BioGptDecoderLayer
+from transformers import BioGptConfig, BioGptModel, BioGptForCausalLM, BioGptForSequenceClassification
+from transformers.modeling_outputs import CausalLMOutputWithCrossAttentions, BaseModelOutputWithPastAndCrossAttentions, \
+    SequenceClassifierOutputWithPast
 
 from settings.utils import ImgSizes
 
 logger = logging.getLogger(__name__)
 
+@dataclass
+class SequenceClassifierOutputWithPastAndCrossAttentions(SequenceClassifierOutputWithPast):
+    cross_attentions: Optional[Tuple[torch.FloatTensor]] = None
 
 class BioGptConfigWithCrossAttention(BioGptConfig):
     def __init__(self, cross_attention_reduce_factor, image_shape=ImgSizes.large.value, **kwargs):
@@ -40,7 +43,7 @@ class BioGptAttentionWithCross(BioGptAttention):
         self.is_cross_attention = is_cross_attention
         self.cross_attention_reduce_factor = config.cross_attention_reduce_factor
         self.image_shape = config.image_shape
-        self.image_size = self.image_shape[0] * 2
+        self.image_size = self.image_shape[0] + self.image_shape[1]
 
         if self.is_cross_attention:
             self.k_proj = nn.Linear(self.image_size, int(embed_dim / self.cross_attention_reduce_factor), bias=bias)
@@ -492,4 +495,99 @@ class BioGptForCausalLMWithCrossAttention(BioGptForCausalLM):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
             cross_attentions=outputs.cross_attentions,
+        )
+
+
+class BioGptForSequenceClassificationWithCrossAttention(BioGptForSequenceClassification):
+    def __init__(self, config: BioGptConfigWithCrossAttention):
+        super().__init__(config)
+        self.biogpt = BioGptModelWithCrossAttention(config)
+
+    def forward(
+            self,
+            input_ids: Optional[torch.LongTensor] = None,
+            attention_mask: Optional[torch.FloatTensor] = None,
+            head_mask: Optional[torch.FloatTensor] = None,
+            past_key_values: Optional[Tuple[Tuple[torch.Tensor]]] = None,
+            inputs_embeds: Optional[torch.FloatTensor] = None,
+            labels: Optional[torch.LongTensor] = None,
+            use_cache: Optional[bool] = None,
+            output_attentions: Optional[bool] = None,
+            output_hidden_states: Optional[bool] = None,
+            return_dict: Optional[bool] = None,
+            encoder_hidden_states: Optional[torch.Tensor] = None,
+            encoder_attention_mask: Optional[torch.FloatTensor] = None,
+            cross_attn_head_mask: Optional[torch.Tensor] = None,
+    ) -> Union[Tuple, SequenceClassifierOutputWithPast]:
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        transformer_outputs = self.biogpt(
+            input_ids,
+            past_key_values=past_key_values,
+            attention_mask=attention_mask,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            encoder_hidden_states=encoder_hidden_states,
+            encoder_attention_mask=encoder_attention_mask,
+            cross_attn_head_mask=cross_attn_head_mask
+        )
+        hidden_states = transformer_outputs[0]
+        logits = self.score(hidden_states)
+
+        if input_ids is not None:
+            batch_size, sequence_length = input_ids.shape[:2]
+        else:
+            batch_size, sequence_length = inputs_embeds.shape[:2]
+
+        if self.config.pad_token_id is None:
+            sequence_length = -1
+        else:
+            if input_ids is not None:
+                sequence_length = (torch.ne(input_ids, self.config.pad_token_id).sum(-1) - 1).to(logits.device)
+            else:
+                sequence_length = -1
+                logger.warning(
+                    f"{self.__class__.__name__} will not detect padding tokens in `inputs_embeds`. Results may be "
+                    "unexpected if using padding tokens in conjunction with `inputs_embeds.`"
+                )
+
+        pooled_logits = logits[torch.arange(batch_size, device=logits.device), sequence_length]
+
+        loss = None
+        if labels is not None:
+            if self.config.problem_type is None:
+                if self.num_labels == 1:
+                    self.config.problem_type = "regression"
+                elif self.num_labels > 1 and (labels.dtype == torch.long or labels.dtype == torch.int):
+                    self.config.problem_type = "single_label_classification"
+                else:
+                    self.config.problem_type = "multi_label_classification"
+
+            if self.config.problem_type == "regression":
+                loss_fct = MSELoss()
+                if self.num_labels == 1:
+                    loss = loss_fct(pooled_logits.squeeze(), labels.squeeze())
+                else:
+                    loss = loss_fct(pooled_logits, labels)
+            elif self.config.problem_type == "single_label_classification":
+                loss_fct = CrossEntropyLoss()
+                loss = loss_fct(pooled_logits.view(-1, self.num_labels), labels.view(-1))
+            elif self.config.problem_type == "multi_label_classification":
+                loss_fct = BCEWithLogitsLoss()
+                loss = loss_fct(pooled_logits, labels)
+        if not return_dict:
+            output = (pooled_logits,) + transformer_outputs[1:]
+            return ((loss,) + output) if loss is not None else output
+
+        return SequenceClassifierOutputWithPastAndCrossAttentions(
+            loss=loss,
+            logits=pooled_logits,
+            past_key_values=transformer_outputs.past_key_values,
+            hidden_states=transformer_outputs.hidden_states,
+            attentions=transformer_outputs.attentions,
+            cross_attentions=transformer_outputs.cross_attentions
         )

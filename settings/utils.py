@@ -1,4 +1,6 @@
 import logging
+from collections import defaultdict
+
 import numpy
 import random
 import torch
@@ -46,12 +48,27 @@ class MimicCXRViewPositions(Enum):
     lateral = 'LATERAL'
     antero_posterior = 'AP'
     left_lateral = 'LL'
-    nan = 'NaN'
+    nan = 'nan'
     left_anterior_oblique = 'LAO'
     right_anterior_oblique = 'RAO'
     ap_axial = 'AP AXIAL'
     swimmers = 'SWIMMERS'
     pa_lld = 'PA LLD'
+
+
+ViewPositionTokens = defaultdict(lambda: 'NAN')
+
+ViewPositionTokens.update(
+    PA='PA',
+    LATERAL='LAT',
+    AP='AP',
+    LL='LL',
+    LAO='LAO',
+    RAO='RAO',
+    SWIMMERS='SWM'
+)
+ViewPositionTokens['AP AXIAL'] = 'APA'
+ViewPositionTokens['PA LLD'] = 'LLD'
 
 
 def pad_sequences(sequences, max_length=None, dtype="int32", value=0):
