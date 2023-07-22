@@ -52,19 +52,17 @@ def load_data(args: Arguments) -> Tuple:
     tokenizer = BioGptTokenizer.from_pretrained(settings.BIOGPT_CHECKPOINT, use_fast=True)
     processor = ViTImageProcessor.from_pretrained(settings.VIT_CHECKPOINT)
 
-    data_collator = CollatorForCXR(tokenizer=tokenizer, max_seq_length=args.max_seq_length)
+    data_collator = CollatorForCXR(tokenizer=tokenizer, max_seq_length=args.max_seq_length, processor=processor)
 
     train_dataset: MimicCXRDataset = MimicCXRDataset(
         args=args,
         tokenizer=tokenizer,
-        processor=processor,
         split=Splits.train.value,
     )
 
     test_dataset: MimicCXRDataset = MimicCXRDataset(
         args=args,
         tokenizer=tokenizer,
-        processor=processor,
         split=Splits.test.value,
         label2idx=train_dataset.label2idx,
     )
@@ -142,12 +140,12 @@ def train(tokenizer, train_dataset, dev_dataset, args, idx2label, data_collator)
 
     trainer, model = build_trainer(tokenizer, train_dataset, dev_dataset, args, idx2label, data_collator)
     train_metrics = trainer.train()
-    dev_metrics = trainer.predict(dev_dataset, metric_key_prefix=Splits.dev.value)["metrics"]
+    dev_metrics = trainer.predict(dev_dataset, metric_key_prefix=Splits.test.value)["metrics"]
 
     args.complete_running_time = print_seconds(time.time() - args.init_args_time)
 
     log_metrics(split=Splits.train.value, metrics=train_metrics)
-    log_metrics(split=Splits.dev.value, metrics=dev_metrics)
+    log_metrics(split=Splits.test.value, metrics=dev_metrics)
 
     write_object_to_json_file(
         data=dict(

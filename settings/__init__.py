@@ -28,7 +28,7 @@ MAX_SEQ_LENGTH = 1024
 NUM_LABELS = 50
 PARAMS2REDUCE_FACTOR = {28: 1, 14: 2, 7: 4, 3.5: 8, 1.75: 16}
 
-DATA_SPLIT = DataSamples.sample.value
+DATA_SPLIT = DataSamples.full.value
 CACHE_DIR = os.path.join(ROOT_DIR, f'cache_{DATA_SPLIT}_{MAX_SEQ_LENGTH}_seq_len')
 DATA_DIR = os.path.join(ROOT_DIR, 'data', DATA_SPLIT)
 OUTPUT_DIR = os.path.join(ROOT_DIR, 'model_output', datetime.now().strftime('%m_%d'))

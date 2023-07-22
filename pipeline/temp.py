@@ -2,7 +2,7 @@ import os
 
 from transformers import ViTForImageClassification, VisionEncoderDecoderModel, ViTImageProcessor, ViTModel, \
     BioGptTokenizer, ViTConfig, BioGptConfig, VisionEncoderDecoderConfig, BioGptForCausalLM, GPT2Config, GPT2Tokenizer, \
-    GPT2Model, OPTModel, XGLMModel, BioGptModel
+    GPT2Model, OPTModel, XGLMModel, BioGptModel, CLIPModel, CLIPVisionModel
 
 import requests
 from PIL import Image
