@@ -16,9 +16,11 @@ from settings.utils import ImgSizes
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class SequenceClassifierOutputWithPastAndCrossAttentions(SequenceClassifierOutputWithPast):
     cross_attentions: Optional[Tuple[torch.FloatTensor]] = None
+
 
 class BioGptConfigWithCrossAttention(BioGptConfig):
     def __init__(self, cross_attention_reduce_factor, image_shape=ImgSizes.large.value, **kwargs):

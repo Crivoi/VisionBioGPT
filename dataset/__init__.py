@@ -271,7 +271,7 @@ class CollatorForCXR:
         batch['pixel_values'] = list(
             map(lambda path: self.extract_img_features(os.path.join(self.data_dir, path)), batch['path'])
         )
-        batch['pixel_values'] = torch.stack(batch['pixel_values']).squeeze()
+        batch['pixel_values'] = torch.stack(batch['pixel_values']).squeeze(1)
         batch.pop('path')
 
         assert self.task_name in ["singlelabel", "multilabel"]
