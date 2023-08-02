@@ -251,12 +251,13 @@ class MimicCXRDataset(Dataset):
 
 
 class CollatorForCXR:
-    def __init__(self, tokenizer, max_seq_length, processor=None, task_name="multilabel"):
+    def __init__(self, tokenizer, max_seq_length, processor=None, task_name="multilabel", args=None):
         self.tokenizer = tokenizer
         self.max_seq_length = max_seq_length
         self.task_name = task_name
         self.processor = processor
         self.data_dir = CXR_DATA_DIR
+        self.args = args
 
     def __call__(self, features):
         max_seq_length = max([len(f["input_ids"]) for f in features])
@@ -264,15 +265,19 @@ class CollatorForCXR:
 
         batch = self.tokenizer.pad(features, padding=True, max_length=max_seq_length)
 
-        for k in ['input_ids', 'attention_mask']:
-            batch[f'decoder_{k}'] = torch.tensor(batch[k], dtype=torch.int64)
-            batch.pop(k)
+        if self.args and self.args.do_pixel_values:
+            for k in ['input_ids', 'attention_mask']:
+                batch[f'decoder_{k}'] = torch.tensor(batch[k], dtype=torch.int64)
+                batch.pop(k)
 
-        batch['pixel_values'] = list(
-            map(lambda path: self.extract_img_features(os.path.join(self.data_dir, path)), batch['path'])
-        )
-        batch['pixel_values'] = torch.stack(batch['pixel_values']).squeeze(1)
-        batch.pop('path')
+            batch['pixel_values'] = list(
+                map(lambda path: self.extract_img_features(os.path.join(self.data_dir, path)), batch['path'])
+            )
+            batch['pixel_values'] = torch.stack(batch['pixel_values']).squeeze(1)
+        else:
+            for k in ['input_ids', 'attention_mask']:
+                batch[k] = torch.tensor(batch[k], dtype=torch.int64)
+            batch.pop('path')
 
         assert self.task_name in ["singlelabel", "multilabel"]
         if self.task_name == "singlelabel":

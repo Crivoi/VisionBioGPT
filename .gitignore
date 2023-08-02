@@ -7,3 +7,4 @@ cache-temp/*
 cache_sample/*
 
 /dainlp_code/*
+!/report/Thesis.zip

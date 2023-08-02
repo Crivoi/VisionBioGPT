@@ -2,9 +2,10 @@ import numpy as np
 from collections import defaultdict
 from sklearn.metrics import roc_curve, auc
 
-
 '''[2022-Mar-30] https://github.com/jamesmullenbach/caml-mimic/blob/master/evaluation.py#L115
 Number of gold labels in top k predictions / Number of gold labels'''
+
+
 def recall_at_k(all_logits, all_golds, k=5):
     topk_logits = np.argsort(all_logits)[:, ::-1][:, :k]
     values = []
@@ -19,6 +20,8 @@ def recall_at_k(all_logits, all_golds, k=5):
 
 '''[2022-Mar-30] https://github.com/jamesmullenbach/caml-mimic/blob/master/evaluation.py#L132
 Number of gold labels in top k predictions / k'''
+
+
 def precision_at_k(all_logits, all_golds, k=5):
     topk_logits = np.argsort(all_logits)[:, ::-1][:, :k]
     values = []
@@ -30,6 +33,8 @@ def precision_at_k(all_logits, all_golds, k=5):
 
 
 '''[2022-Mar-30] https://github.com/jamesmullenbach/caml-mimic/blob/master/evaluation.py#L169'''
+
+
 def auc_metrics(all_logits, all_golds):
     all_fps, all_tps, all_auc = {}, {}, {}
     labels = []
@@ -52,6 +57,8 @@ def auc_metrics(all_logits, all_golds):
 
 
 '''[20220330]'''
+
+
 def calculate_f1(true_positive, false_positive=None, num_predicted=None, false_negative=None, num_gold=None):
     assert num_predicted is not None or false_positive is not None
     num_predicted = num_predicted if num_predicted is not None else true_positive + false_positive
@@ -66,6 +73,8 @@ def calculate_f1(true_positive, false_positive=None, num_predicted=None, false_n
 
 
 '''[20220330]'''
+
+
 class F_Score:
     def __init__(self):
         self._tps = defaultdict(int)
