@@ -1,9 +1,18 @@
-import json, logging, numpy, os, re, shutil
+"""
+https://github.com/coastalcph/trldc/blob/main/dainlp/utils/files.py
+"""
+import json
+import logging
+import os
+import re
+import shutil
 from pathlib import Path
+
+import numpy
 
 logger = logging.getLogger(__name__)
 
-'''[2021-Dec-31]'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/files.py#L9"""
 
 
 class NumpyJSONEncoder(json.JSONEncoder):
@@ -18,7 +27,7 @@ class NumpyJSONEncoder(json.JSONEncoder):
             return super(NumpyJSONEncoder, self).default(obj)
 
 
-'''[2021-Aug-18]'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/files.py#L22"""
 
 
 def make_sure_parent_dir_exists(filepath):
@@ -26,18 +35,7 @@ def make_sure_parent_dir_exists(filepath):
     os.makedirs(parent_dir, exist_ok=True)
 
 
-'''[2021-Aug-18]'''
-
-
-def write_list_to_json_file(data, filepath):
-    make_sure_parent_dir_exists(filepath)
-
-    with open(filepath, "w") as f:
-        for i in data:
-            f.write(f"{json.dumps(i, cls=NumpyJSONEncoder)}\n")
-
-
-'''[2021-Aug-19]'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/files.py#L37"""
 
 
 def write_object_to_json_file(data, filepath, sort_keys=False):
@@ -45,18 +43,7 @@ def write_object_to_json_file(data, filepath, sort_keys=False):
     json.dump(data, open(filepath, "w"), indent=2, sort_keys=sort_keys, default=lambda o: "Unknown")
 
 
-# [2021-08-29]
-def move_best_checkpoint(output_dir, best_checkpoint):
-    output_dir = os.path.abspath(output_dir)
-    best_checkpoint = os.path.abspath(best_checkpoint)
-    for filename in os.listdir(best_checkpoint):
-        shutil.move(f"{best_checkpoint}/{filename}", f"{output_dir}/{filename}")
-    for checkpoint in os.listdir(output_dir):
-        if checkpoint.startswith("checkpoint"):
-            shutil.rmtree(f"{output_dir}/{checkpoint}")
-
-
-'''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L2146'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/files.py#L53"""
 
 
 def remove_checkpoints(output_dir, prefix, save_total_limit, best_model_checkpoint=None):
@@ -70,7 +57,7 @@ def remove_checkpoints(output_dir, prefix, save_total_limit, best_model_checkpoi
         shutil.rmtree(checkpoint)
 
 
-'''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L2122'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/files.py#L65"""
 
 
 def sorted_checkpoints(output_dir, prefix, best_model_checkpoint):

@@ -1,9 +1,15 @@
-import logging, math, torch
+"""
+https://github.com/coastalcph/trldc/blob/main/dainlp/training/scheduler.py
+"""
+import logging
+import math
+
+import torch
 from transformers.file_utils import ExplicitEnum
 
 logger = logging.getLogger(__name__)
 
-'''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/optimization.py#L75'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/training/scheduler.py#L9"""
 
 
 def get_linear_schedule_with_warmup(optimizer, warmup_steps, num_training_steps):
@@ -15,7 +21,7 @@ def get_linear_schedule_with_warmup(optimizer, warmup_steps, num_training_steps)
     return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
 
-'''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/optimization.py#L104'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/training/scheduler.py#L18"""
 
 
 def get_cosine_schedule_with_warmup(optimizer, warmup_steps, num_training_steps, num_cycles=0.5):
@@ -28,7 +34,7 @@ def get_cosine_schedule_with_warmup(optimizer, warmup_steps, num_training_steps,
     return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
 
-'''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_utils.py#L281'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/training/scheduler.py#L28"""
 
 
 class SchedulerType(ExplicitEnum):
@@ -41,7 +47,8 @@ class SchedulerType(ExplicitEnum):
     CONSTANT_WITH_WARMUP = "constant_with_warmup"
 
 
-'''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/optimization.py#L223'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/training/scheduler.py#L39"""
+
 TYPE_TO_SCHEDULER_FUNCTION = {
     SchedulerType.LINEAR: get_linear_schedule_with_warmup,
     SchedulerType.LINEAR_WITH_WARMUP: get_linear_schedule_with_warmup,
@@ -52,8 +59,7 @@ TYPE_TO_SCHEDULER_FUNCTION = {
     # SchedulerType.CONSTANT_WITH_WARMUP: get_constant_schedule_with_warmup,
 }
 
-'''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L883
-                 https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/optimization.py#L233'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/training/scheduler.py#L52"""
 
 
 def create_scheduler(lr_scheduler_type, optimizer, num_training_steps, warmup_steps=0, warmup_ratio=0):

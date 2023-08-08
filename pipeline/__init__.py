@@ -1,3 +1,6 @@
+"""
+https://github.com/coastalcph/trldc/blob/main/dainlp/training/__init__.py
+"""
 import collections
 import logging
 import math
@@ -16,13 +19,18 @@ from pipeline.optimizer import create_optimizer
 from pipeline.scheduler import create_scheduler
 from pipeline.utils import get_eval_dataloader, get_train_dataloader, training_step, prediction_step
 from pipeline.utils import load_state_dict_in_model, save_checkpoint, wrap_model
-from settings.utils import set_seed
 from settings.print import print_large_integer, speed_metrics, log_remaining_time
 from settings.resources import MemoryTracker
 from settings.tensors import distributed_broadcast_scalars, denumpify_detensorize, pad_across_processes
 from settings.tensors import nested_gather, nested_truncate, nested_numpify, nested_concat
+from settings.utils import set_seed
 
 logger = logging.getLogger(__name__)
+
+"""
+Main Trainer class adapted from:
+https://github.com/coastalcph/trldc/blob/main/dainlp/training/__init__.py#L20
+"""
 
 
 class Trainer:

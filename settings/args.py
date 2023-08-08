@@ -1,19 +1,26 @@
-import dataclasses, logging, time, torch
+"""
+https://github.com/coastalcph/trldc/blob/main/dainlp/utils/args.py
+"""
+import dataclasses
+import logging
 import os
+import time
 from argparse import ArgumentParser
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from functools import cached_property
 
+import torch
+
 import settings
+from pipeline.callback import IntervalStrategy
 from pipeline.optimizer import OptimizerNames
 from pipeline.scheduler import SchedulerType
-from pipeline.callback import IntervalStrategy
 from settings.__init__ import DEVICE
 
 logger = logging.getLogger(__name__)
 
-'''[TODO] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/training_args.py#L1321'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/args.py#L17"""
 
 
 class ParallelMode(Enum):
@@ -22,10 +29,11 @@ class ParallelMode(Enum):
     NOT_DISTRIBUTED = "not_distributed"
 
 
-'''[2022-Feb-18] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/hf_argparser.py#L44'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/args.py#L24"""
 
 
 class HfArgumentParser(ArgumentParser):
+
     def __init__(self, dataclass_types):
         super(HfArgumentParser, self).__init__()
         assert type(dataclass_types) in [list, tuple]
@@ -70,7 +78,7 @@ class HfArgumentParser(ArgumentParser):
         return (*outputs,)
 
 
-'''[TODO]'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/args.py#L71"""
 
 
 @dataclass
@@ -101,7 +109,7 @@ class ArgumentsBase:
     skip_memory_metrics: bool = field(default=True)
 
 
-'''[TODO]'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/args.py#L98"""
 
 
 @dataclass
@@ -153,12 +161,15 @@ class TrainingArguments:
         return self.per_device_eval_batch_size * max(1, self.n_gpu)
 
 
-'''[TODO]'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/args.py#L146"""
 
 
 @dataclass
 class TestArguments:
     output_predictions_filepath: str = field(default=os.path.join(settings.OUTPUT_DIR, "preds.json"))
+
+
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/args.py#L152"""
 
 
 @dataclass
@@ -167,7 +178,7 @@ class TextArguments:
     do_lower_case: bool = field(default=False)
 
 
-'''[20220330]'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/args.py#L159"""
 
 
 @dataclass
@@ -268,15 +279,7 @@ class Arguments(ArgumentsBase, TrainingArguments, TestArguments, TextArguments):
         return self.local_process_index == 0
 
 
-'''[20220330]'''
-
-
-@dataclass
-class ArgumentsForLongformer(Arguments):
-    local_size: int = field(default=512)
-
-
-'''[20220330]'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/args.py#L270"""
 
 
 @dataclass
@@ -286,3 +289,7 @@ class ArgumentsForHiTransformer(Arguments):
     add_cls_each_segment: bool = field(default=False)
     do_use_stride: bool = field(default=False)
     do_use_label_wise_attention: bool = field(default=False)
+
+
+if __name__ == '__main__':
+    pass

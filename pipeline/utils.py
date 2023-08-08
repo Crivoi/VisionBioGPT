@@ -1,9 +1,15 @@
-import collections, logging, math, numpy, os, torch
+"""
+https://github.com/coastalcph/trldc/blob/main/dainlp/training/utils.py
+"""
+import collections
+import logging
+import math
+import os
 from collections.abc import Mapping
 
-import wandb
+import numpy
+import torch
 
-import settings
 from settings.files import remove_checkpoints
 from settings.tensors import nested_detach
 

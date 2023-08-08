@@ -1,10 +1,10 @@
 import logging
+import random
 from collections import defaultdict
+from enum import Enum
 
 import numpy
-import random
 import torch
-from enum import Enum
 
 logger = logging.getLogger(__name__)
 
@@ -69,22 +69,6 @@ ViewPositionTokens.update(
 )
 ViewPositionTokens['AP AXIAL'] = 'APA'
 ViewPositionTokens['PA LLD'] = 'LLD'
-
-
-def pad_sequences(sequences, max_length=None, dtype="int32", value=0):
-    """[2022-Feb-17] https://github.com/LorrinWWW/Pyramid/blob/master/utils/data.py#L327"""
-    batch_size = len(sequences)
-    if max_length is None:
-        max_length = max([len(s) for s in sequences])
-
-    sample_shape = numpy.asarray(sequences[0]).shape[1:]
-    padded_sequences = numpy.full((batch_size, max_length) + sample_shape, value, dtype=dtype)
-    for i, s in enumerate(sequences):
-        assert len(s) > 0
-        trunc_s = numpy.asarray(s[:max_length], dtype=dtype)
-        padded_sequences[i, :len(trunc_s)] = trunc_s
-
-    return padded_sequences
 
 
 def set_seed(seed=52):

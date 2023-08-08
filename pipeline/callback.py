@@ -1,12 +1,20 @@
-import dataclasses, json, logging, time
+"""
+https://github.com/coastalcph/trldc/blob/main/dainlp/training/callback.py
+"""
+import dataclasses
+import json
+import logging
+import time
 from dataclasses import dataclass
 from typing import List
-from settings.print import log_remaining_time
+
 from transformers.file_utils import ExplicitEnum
+
+from settings.print import log_remaining_time
 
 logger = logging.getLogger(__name__)
 
-'''[TODO] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_utils.py#L115'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/training/callback.py#L12"""
 
 
 class IntervalStrategy(ExplicitEnum):
@@ -15,7 +23,7 @@ class IntervalStrategy(ExplicitEnum):
     EPOCH = "epoch"
 
 
-'''[2022-Mar-11] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_callback.py#L36'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/training/callback.py#L20"""
 
 
 @dataclass
@@ -45,7 +53,7 @@ class TrainerState:
             f.write(json.dumps(dataclasses.asdict(self), indent=2, sort_keys=True) + "\n")
 
 
-'''[2022-Mar-11] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_callback.py#L111'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/training/callback.py#L48"""
 
 
 @dataclass
@@ -68,7 +76,7 @@ class TrainerControl:
         self.should_log = False
 
 
-'''[2022-Mar-11] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_callback.py#L160'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/training/callback.py#L68"""
 
 
 class TrainerCallback:
@@ -109,7 +117,7 @@ class TrainerCallback:
         pass
 
 
-'''[2022-Mar-11] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_callback.py#L285'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/training/callback.py#L107"""
 
 
 class CallbackHandler(TrainerCallback):
@@ -184,7 +192,7 @@ class CallbackHandler(TrainerCallback):
         return self.call_event("on_prediction_step", args, state, control)
 
 
-'''[2022-Mar-11] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_callback.py#L407'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/training/callback.py#L180"""
 
 
 class DefaultFlowCallback(TrainerCallback):
@@ -221,7 +229,7 @@ class DefaultFlowCallback(TrainerCallback):
             log_remaining_time(state.global_step, state.max_steps, state.start_time, suffix=suffix)
 
 
-'''[TODO] https://github.com/huggingface/transformers/blob/v4.17.0/src/transformers/trainer_callback.py#L505'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/training/callback.py#L215"""
 
 
 class EarlyStoppingCallback(TrainerCallback):

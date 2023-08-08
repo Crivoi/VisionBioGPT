@@ -1,7 +1,12 @@
-import numpy, torch
+"""
+https://github.com/coastalcph/trldc/blob/main/dainlp/utils/tensors.py
+"""
+import numpy
+import torch
+
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/tensors.py#L5"""
 
 
-'''[2022-Feb-17] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_pt_utils.py#L67'''
 def pad_and_concatenate(tensor1, tensor2, padding_index=-100):
     """Concatenate `tensor1` and `tensor2` on the first axis (e.g., representing batch size)
     and apply padding on the second axis (e.g., representing sequence length)"""
@@ -15,7 +20,9 @@ def pad_and_concatenate(tensor1, tensor2, padding_index=-100):
     return result
 
 
-'''[2022-Feb-17] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_pt_utils.py#L97'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/tensors.py#L19"""
+
+
 def nested_concat(tensor1, tensor2, padding_index=-100):
     assert type(tensor1) == type(tensor2)
     if isinstance(tensor1, (list, tuple)):
@@ -26,14 +33,18 @@ def nested_concat(tensor1, tensor2, padding_index=-100):
         raise NotImplemented
 
 
-'''[2022-Feb-17] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_pt_utils.py#L148'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/tensors.py#L30"""
+
+
 def nested_detach(tensors):
     if isinstance(tensors, (list, tuple)):
         return type(tensors)(nested_detach(t) for t in tensors)
     return tensors.detach()
 
 
-'''[2022-Feb-17] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_pt_utils.py#L135'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/tensors.py#L37"""
+
+
 def nested_numpify(tensors):
     if isinstance(tensors, (list, tuple)):
         return type(tensors)(nested_numpify(t) for t in tensors)
@@ -42,14 +53,18 @@ def nested_numpify(tensors):
     return t.numpy()
 
 
-'''[2022-Feb-17] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_pt_utils.py#L331'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/tensors.py#L46"""
+
+
 def nested_truncate(tensors, limit):
     if isinstance(tensors, (list, tuple)):
         return type(tensors)(nested_truncate(t, limit) for t in tensors)
     return tensors[:limit]
 
 
-'''[2022-Feb-17] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_utils.py#L502'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/tensors.py#L53"""
+
+
 def denumpify_detensorize(metrics):
     """Call `.item()`"""
     if isinstance(metrics, (list, tuple)):
@@ -63,7 +78,9 @@ def denumpify_detensorize(metrics):
     return metrics
 
 
-'''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L2471'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/tensors.py#L67"""
+
+
 def nested_gather(tensors, local_rank):
     if tensors is None: return
     if local_rank != -1:
@@ -71,7 +88,9 @@ def nested_gather(tensors, local_rank):
     return tensors
 
 
-'''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_pt_utils.py#L185'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/tensors.py#L75"""
+
+
 def distributed_broadcast_scalars(scalars, device):
     try:
         tensorized_scalar = torch.tensor(scalars).to(device)
@@ -83,7 +102,9 @@ def distributed_broadcast_scalars(scalars, device):
         raise AssertionError("Not using distributed training")
 
 
-'''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_pt_utils.py'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/tensors.py#L87"""
+
+
 def distributed_concat(tensor):
     try:
         if isinstance(tensor, (tuple, list)):
@@ -97,7 +118,9 @@ def distributed_concat(tensor):
         raise AssertionError("Not using distributed training")
 
 
-'''[2022-Feb-17] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L2489'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/tensors.py#L101"""
+
+
 def pad_across_processes(tensors, padding_index=-100):
     """Pad the tensors to the same size so that they can safely be gathered"""
     if isinstance(tensors, (list, tuple)):

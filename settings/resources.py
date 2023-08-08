@@ -1,9 +1,19 @@
-import gc, inspect, logging, psutil, threading, torch
+"""
+https://github.com/coastalcph/trldc/blob/main/dainlp/utils/resources.py
+"""
+import gc
+import inspect
+import logging
+import threading
+
+import psutil
+import torch
 
 logger = logging.getLogger(__name__)
 
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/utils/resources.py#L9"""
 
-'''[2022-Feb-17] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_utils.py#L290'''
+
 class MemoryTracker:
     stages = {"__init__": "init", "train": "train", "evaluate": "eval", "predict": "test"}
 

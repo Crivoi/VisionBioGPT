@@ -1,11 +1,13 @@
-import logging, torch
-from transformers.optimization import AdamW
+import logging
+import torch
+
 from torch.optim import SGD
 from transformers.file_utils import ExplicitEnum
+from transformers.optimization import AdamW
 
 logger = logging.getLogger(__name__)
 
-'''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/training_args.py#L73'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/training/optimizer.py#L11"""
 
 
 class OptimizerNames(ExplicitEnum):
@@ -13,7 +15,7 @@ class OptimizerNames(ExplicitEnum):
     SGD = "sgd"
 
 
-'''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer_pt_utils.py#L996'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/training/optimizer.py#L17"""
 
 
 def get_parameter_names(model, skipped_types):
@@ -25,7 +27,7 @@ def get_parameter_names(model, skipped_types):
     return result
 
 
-'''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L844'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/training/optimizer.py#L27"""
 
 
 def get_optimizer_cls_and_kwargs(args):
@@ -43,7 +45,7 @@ def get_optimizer_cls_and_kwargs(args):
     return optimizer_cls, optimizer_kwargs
 
 
-'''[2022-Mar-10] https://github.com/huggingface/transformers/blob/v4.16.2/src/transformers/trainer.py#L806'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/training/optimizer.py#L43"""
 
 
 def create_optimizer(model, args):
@@ -56,22 +58,3 @@ def create_optimizer(model, args):
     optimizer_cls, optimizer_kwargs = get_optimizer_cls_and_kwargs(args)
     optimizer = optimizer_cls(optimizer_grouped_parameters, **optimizer_kwargs)
     return optimizer
-
-
-'''[TODO]'''
-
-
-def get_SGD_optimizer(model, learning_rate, weight_decay):
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9, weight_decay=weight_decay)
-    return optimizer
-
-
-'''[TODO] https://github.com/princeton-nlp/PURE/blob/main/run_entity.py#L206'''
-
-
-def get_discriminative_AdamW_optimizer(model, bert_lr, task_lr):
-    params = list(model.named_parameters())
-    grouped_parameters = []
-    grouped_parameters.append({"params": [p for n, p in params if "bert" in n]})
-    grouped_parameters.append({"params": [p for n, p in params if "bert" not in n], "lr": task_lr})
-    return AdamW(grouped_parameters, lr=bert_lr)
