@@ -1,6 +1,3 @@
-"""
-
-"""
 import dataclasses
 import logging
 import os
@@ -13,8 +10,7 @@ import wandb
 from transformers import BioGptTokenizer, BioGptConfig, BioGptForSequenceClassification, BioGptModel
 
 import settings
-from dataset import MimicCXRDataset
-from dataset.mimic_cxr import CollatorForCXR
+from dataset.mimic_cxr import CollatorForCXR, MimicCXRDataset
 from metrics import Metric
 from pipeline import Trainer
 from pipeline.callback import EarlyStoppingCallback

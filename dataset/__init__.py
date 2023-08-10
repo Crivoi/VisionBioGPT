@@ -12,10 +12,11 @@ import torch
 from filelock import FileLock
 from torch.utils.data import Dataset
 
-from dataset.mimic_cxr import MimicCXRDataset
 from settings.args import Arguments
 
 logger = logging.getLogger(__name__)
+
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/data/cls/__init__.py#L9"""
 
 
 class MimicDataset(Dataset):

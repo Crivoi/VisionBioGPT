@@ -1,10 +1,9 @@
 import dataclasses
-import json
 import logging
 import os
 import time
-from typing import Dict, Tuple
 from datetime import datetime
+from typing import Dict, Tuple
 
 import torch
 from transformers import BioGptTokenizer, BioGptConfig, BioGptForSequenceClassification, BioGptModel
@@ -16,8 +15,8 @@ from pipeline import Trainer
 from pipeline.callback import EarlyStoppingCallback
 from settings.args import HfArgumentParser, ArgumentsForHiTransformer as Arguments
 from settings.files import write_object_to_json_file
-from settings.utils import set_seed, Splits
 from settings.print import set_logging_format, print_seconds, log_metrics
+from settings.utils import set_seed, Splits
 
 logger = logging.getLogger(__name__)
 

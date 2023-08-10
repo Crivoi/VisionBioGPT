@@ -1,12 +1,13 @@
-import torch
-
-from torch.nn import CrossEntropyLoss
 from typing import Union, Tuple, Optional
+
+import torch
+from torch.nn import CrossEntropyLoss
 from transformers import VisionEncoderDecoderModel
 from transformers.modeling_outputs import Seq2SeqLMOutput, BaseModelOutput
 
+"""https://github.com/huggingface/transformers/blob/main/src/transformers/models/encoder_decoder/modeling_encoder_decoder.py#L151"""
 
-# Copied from transformers.models.encoder_decoder.modeling_encoder_decoder.shift_tokens_right
+
 def shift_tokens_right(input_ids: torch.Tensor, pad_token_id: int, decoder_start_token_id: int):
     """
     Shift input ids one token to the right.

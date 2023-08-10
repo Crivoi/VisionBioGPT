@@ -1,25 +1,12 @@
-import numpy as np
+"""
+https://github.com/coastalcph/trldc/blob/main/dainlp/metrics/utils.py
+"""
 from collections import defaultdict
+
+import numpy as np
 from sklearn.metrics import roc_curve, auc
 
-'''[2022-Mar-30] https://github.com/jamesmullenbach/caml-mimic/blob/master/evaluation.py#L115
-Number of gold labels in top k predictions / Number of gold labels'''
-
-
-def recall_at_k(all_logits, all_golds, k=5):
-    topk_logits = np.argsort(all_logits)[:, ::-1][:, :k]
-    values = []
-    for i, pred in enumerate(topk_logits):
-        correct = all_golds[i, pred].sum()
-        values.append(correct / float(len(all_golds[i, :].sum())))
-
-    values = np.array(values)
-    values[np.isnan(values)] = 0
-    return {f"recall@{k}": np.mean(values)}
-
-
-'''[2022-Mar-30] https://github.com/jamesmullenbach/caml-mimic/blob/master/evaluation.py#L132
-Number of gold labels in top k predictions / k'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/metrics/utils.py#L22"""
 
 
 def precision_at_k(all_logits, all_golds, k=5):
@@ -32,7 +19,7 @@ def precision_at_k(all_logits, all_golds, k=5):
     return {f"precision@{k}": np.mean(values)}
 
 
-'''[2022-Mar-30] https://github.com/jamesmullenbach/caml-mimic/blob/master/evaluation.py#L169'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/metrics/utils.py#L33"""
 
 
 def auc_metrics(all_logits, all_golds):
@@ -56,7 +43,7 @@ def auc_metrics(all_logits, all_golds):
     return metrics
 
 
-'''[20220330]'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/metrics/utils.py#L55"""
 
 
 def calculate_f1(true_positive, false_positive=None, num_predicted=None, false_negative=None, num_gold=None):
@@ -72,7 +59,7 @@ def calculate_f1(true_positive, false_positive=None, num_predicted=None, false_n
     return {"precision": precision, "recall": recall, "f1": f1, "num_predicted": num_predicted, "num_gold": num_gold}
 
 
-'''[20220330]'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/metrics/utils.py#L69"""
 
 
 class F_Score:

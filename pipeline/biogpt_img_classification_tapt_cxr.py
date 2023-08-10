@@ -11,8 +11,7 @@ from transformers import BioGptTokenizer, BioGptConfig, ViTImageProcessor, \
     ViTConfig, ViTModel, VisionEncoderDecoderConfig, VisionEncoderDecoderModel
 
 import settings
-from dataset import MimicCXRDataset
-from dataset.mimic_cxr import CollatorForCXR
+from dataset.mimic_cxr import MimicCXRDataset, CollatorForCXR
 from metrics import Metric
 from model.modeling_biogpt import BioGptConfigWithCrossAttention, BioGptForSequenceClassificationWithCrossAttention
 from model.modeling_vision_encoder_decoder import BioGptViTEncoderDecoderModel

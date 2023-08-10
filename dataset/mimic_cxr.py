@@ -5,6 +5,7 @@ Inspired by
 https://github.com/coastalcph/trldc/blob/main/dainlp/data/cls/__init__.py
 """
 import json
+import logging
 import os
 import random
 
@@ -16,10 +17,11 @@ from tqdm import tqdm
 from transformers import BioGptTokenizer
 from transformers.image_processing_utils import BaseImageProcessor
 
-from dataset import logger
 from settings import CXR_DATA_DIR
 from settings.args import Arguments
 from settings.utils import MimicCXRLabels, ViewPositionTokens
+
+logger = logging.getLogger(__name__)
 
 
 class MimicCXRDataset(Dataset):

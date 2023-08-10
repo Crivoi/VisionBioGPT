@@ -1,9 +1,15 @@
-import logging, numpy
+"""
+https://github.com/coastalcph/trldc/blob/main/dainlp/metrics/cls.py
+"""
+import logging
+
+import numpy
+
 from metrics.utils import F_Score, auc_metrics, precision_at_k
 
 logger = logging.getLogger(__name__)
 
-'''[20220330]'''
+"""https://github.com/coastalcph/trldc/blob/main/dainlp/metrics/cls.py#L9"""
 
 
 class Metric:
