@@ -1,0 +1,33 @@
+body {
+    font-family: Söhne, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    color: var(--white);
+    background-color: var(--gray);
+    caret-color: var(--white);
+}
+
+main {
+    max-width: 48em;
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100dvh;
+    padding: 10px 0;
+}
+
+h1 {
+    text-align: center;
+}
+
+#response {
+    border-radius: var(--borderRadius);
+    border: 1px solid var(--darkGray);
+    padding: 10px;
+    margin: 20px 0;
+}
+
+form {
+    display: grid;
+    grid-template-columns: 4fr 1fr;
+    gap: 10px;
+}

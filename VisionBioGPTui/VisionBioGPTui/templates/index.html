@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block body %}
+    <section>
+        <h1>BioGPT UI</h1>
+        <div id="response">Awaiting request...</div>
+    </section>
+    <footer>
+        <form
+                id="form"
+                action="{% url 'model_api' %}"
+                method="POST"
+        >
+            {% csrf_token %}
+            <label>
+                <textarea placeholder="Prompt BioGPT" name="prompt"></textarea>
+            </label>
+            <button type="submit" id="submit">
+                Send
+            </button>
+        </form>
+    </footer>
+{% endblock %}
