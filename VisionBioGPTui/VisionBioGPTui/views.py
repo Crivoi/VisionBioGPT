@@ -20,7 +20,8 @@ class ModelAPIView(View):
         try:
             data = json.loads(request.body)
             prompt = data.get("prompt", "")
-            output = self.generator(prompt, max_length=20, num_return_sequences=1, do_sample=True)[0]
+            max_length = int(data.get("max_length", 50))
+            output = self.generator(prompt, max_length=max_length, num_return_sequences=1, do_sample=True)[0]
             return JsonResponse({'text': output.get('generated_text', 'An error occurred!')})
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)

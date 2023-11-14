@@ -9,7 +9,6 @@
 
     async function postPrompt(data) {
         const {csrfmiddlewaretoken, ...rest} = data;
-        console.log(rest);
         return await fetch('/api/model/', {
             method: 'POST',
             body: JSON.stringify(rest),

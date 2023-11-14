@@ -21,7 +21,7 @@ h1 {
 
 #response {
     border-radius: var(--borderRadius);
-    border: 1px solid var(--darkGray);
+    border: 1px solid var(--whiteTransparent);
     padding: 10px;
     margin: 20px 0;
 }
@@ -30,4 +30,19 @@ form {
     display: grid;
     grid-template-columns: 4fr 1fr;
     gap: 10px;
+    grid-template-areas:
+            'range range'
+            'prompt submit';
+}
+
+.range {
+    grid-area: range;
+}
+
+.prompt {
+    grid-area: prompt;
+}
+
+#submit {
+    grid-area: submit;
 }
