@@ -15,3 +15,7 @@ We initially conduct some experiments to verify BioGPT's classification and gene
 We then extend our experiments to a new dataset: \textbf{MIMIC-CXR} (\cite{Johnson2019MIMICCXR}). We first execute a classification task and obtain promising results with our task-adaptive pre-trained weights. Then, we alter BioGPT's attention block with a cross-attention layer and use it as text-decoder, together with the Vision Transformer as image-encoder and add chest x-rays to our input sequence. This method shows considerably reduced performance compared to our baseline text-only approach.
 
 We believe that our experiments will entice researchers in further experimenting with the BioGPT model in text-only setups for disease classification and expand the model to newer GPT architectures (\cite{brown2020gpt3}, \cite{openai2023gpt4}).
+
+## Resources
+Xiang Dai and Ilias Chalkidis and Sune Darkner and Desmond Elliott. 2022. Revisiting Transformer-based Models for Long Document Classification.
+https://arxiv.org/abs/2204.06683
