@@ -62,8 +62,7 @@ if __name__ == '__main__':
     ved_config.pad_token_id = tokenizer.pad_token_id
     ved_model = BioGptViTEncoderDecoderModel(encoder=vit_model, decoder=biogpt_model, config=ved_config)
 
-    img_path = os.path.join('../data', 'mimic-cxr', 'files_resized', 'p11', 'p11002983', 's51438097',
-                            '20a4f778-2db07135-343812e7-88dc63cf-007d7ddf.jpg')
+    img_path = os.path.join('')
     img = Image.open(img_path).convert('RGB')
 
     img_inputs = processor(img, return_tensors="pt")
@@ -72,14 +71,7 @@ if __name__ == '__main__':
     # outputs = ved_model(pixel_values=img_inputs['pixel_values'], decoder_input_ids=text_inputs['input_ids'])
     # generate_outputs = ved_model.generate(inputs=img_inputs['pixel_values'], max_length=512)
 
-    hypot = """
-     Post median sternotomy and.  No abnormality seen in the seen of the sternum
-     compared to the previous study ___ ___.  The visualized ribs on the chest
-     radiograph appears normal.  The heart is normal in size.  There great vessels
-     including the aorta and pulmonary arteries are unremarkable.  The lungs are
-     clear of ___ portion well-expanded.  There is no pleural effusion or
-     pneumothorax.
-     """
+    hypot = ""
     generate_outputs = ved_model.generate(inputs=img_inputs['pixel_values'], max_length=100)
     generated_text = tokenizer.decode(generate_outputs[0], skip_special_tokens=True)
 
